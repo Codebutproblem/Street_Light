@@ -1,0 +1,51 @@
+@import url("https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap");
+@import "leaflet/dist/leaflet.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+* {
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Be Vietnam Pro", sans-serif;
+  background: #eee;
+}
+
+.bg-signUp {
+  background: url("https://www.cloud.studio/wp-content/uploads/2022/07/featuredStreet-1024x978.webp");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain; /* Adjusts the background to fit within the container */
+  height: 500px;
+  width: 100%; /* Make the background stretch across full width */
+  max-width: 800px; /* Constrain to max-width */
+  background-color: antiquewhite;
+  border-radius: 12px;
+  margin: 200px auto;
+  margin-left: 10%;
+}
+
+.gradient {
+  background: linear-gradient(
+    90deg,
+    rebeccapurple 0%,
+    rgba(255, 38, 38, 0.5) 40%,
+    rgba(255, 38, 38, 0.5) 60%,
+    rebeccapurple 100%
+  );
+  background-size: 200% 100%; /* Makes the gradient twice the width */
+  animation: loading 1.5s ease infinite;
+}
+
+/* Keyframes for loading animation */
+@keyframes loading {
+  0% {
+    background-position: 0% 50%; /* Start at the left */
+  }
+  100% {
+    background-position: 100% 50%; /* Move to the right */
+  }
+}
