@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "nodemon",
+    "docker:start": "docker-compose up -d",
+    "docker:stop": "docker-compose down",
+    "start": "npm run docker:start && nodemon",
     "start:prod": "pm2 start ./src/index.ts --name overflow-api --interpreter ts-node",
     "build": "node --max-old-space-size=4096 -r ts-node/register ./src/index.ts"
   },

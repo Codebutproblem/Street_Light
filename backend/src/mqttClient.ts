@@ -1,6 +1,7 @@
 import mqtt from "mqtt";
+import { sendToQueue } from "./rabbitMQ/rabbitMQInstance";
 
-function connectToMQTT() {
+async function connectToMQTT() {
   const options = {
     host: "a290b9bc05ee4afdbc18a2fd30f92d28.s1.eu.hivemq.cloud",
     port: 8884,
@@ -35,17 +36,46 @@ function connectToMQTT() {
 
   client.on("message", (topic, message) => {
     try {
-      console.log("topic: " + topic);
-      console.log("message: " + message);
+      // console.log("topic: " + topic);
+      // console.log("message: " + message);
       const data = JSON.parse(message.toString());
       const currentTime = new Date().toLocaleTimeString();
 
+      // topic: esp32/Light_Data_BH1750
+      // message: {"light":22.5}
+      // topic: esp32/led_1
+      // message: {"status":"on","brightness":9,"lightIntensity":25,"motionStatus":"No motion detected!"}
+
+      const payload = {
+        motherboard: "",
+        device: "",
+        status: "",
+        brightness: 0,
+        lightIntensity: 0,
+        motionStatus: "",
+        light: 0,
+      };
+
+      const [motherboard, device] = topic.split("/");
       switch (topic) {
         case "esp32/Light_Data_BH1750":
+          payload.light = data.light;
+          payload.device = device;
+          payload.motherboard = motherboard;
+
+          sendToQueue(payload);
           break;
         case "esp32/led_1":
-          break;
+          payload.device = device;
+          payload.motherboard = motherboard;
+          payload.brightness = data.brightness;
+          payload.status = data.status;
+          payload.lightIntensity = data.lightIntensity;
+          payload.motionStatus = data.motionStatus;
 
+          // Send the message to rabbitMQ
+          sendToQueue(payload);
+          break;
         case "esp32/led_2":
           break;
 

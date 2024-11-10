@@ -26,7 +26,9 @@ async function sendToQueue(message: any) {
       }
     );
   } else {
-    console.log("RabbitMQ channel is not available!");
+    console.log(
+      "RabbitMQ channel is not available! Please run the RabbitMQ instance in Docker 😁"
+    );
   }
 }
 

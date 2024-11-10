@@ -8,8 +8,10 @@ import dotenv from "dotenv";
 import http from "http";
 
 import connectToMQTT from "./mqttClient";
-import { connectRabbitMQ } from "rabbitMQ/rabbitMQInstance";
+import { connectRabbitMQ } from "./rabbitMQ/rabbitMQInstance";
+import { startWorker } from "./workers/rabbitmqWorker";
 
+// Cofig .env file
 dotenv.config();
 
 const app = express();
@@ -20,21 +22,35 @@ app.use(
     credentials: true,
   })
 );
-
 app.use(cookieParser());
 app.use(compression());
 app.use(bodyParser.json());
 
+// Connect to mongoDB
 database.connect();
 
+// Create HTTP server
 const server = http.createServer(app);
 server.listen(8087, () => {
   console.log("Server is running on port 8087");
 });
 
-connectToMQTT();
-connectRabbitMQ();
+// TODO: Create socket server
 
+async function handleMqttData() {
+  // Receive data from MQTT
+  await connectToMQTT();
+
+  // Connect to RabbitMQ to create message queue
+  await connectRabbitMQ();
+
+  // create a worker to only save data to Mongo every 5 minutes
+  await startWorker();
+}
+
+handleMqttData();
+
+// handle exceptio error
 process.on("SIGINT", async () => {
   process.exit(0);
 });
