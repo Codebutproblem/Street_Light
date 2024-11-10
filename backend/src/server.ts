@@ -7,9 +7,11 @@ import bodyParser from "body-parser";
 import dotenv from "dotenv";
 import http from "http";
 
-import connectToMQTT from "./mqttClient";
+import mqttClient from "./mqttClient";
 import { connectRabbitMQ } from "./rabbitMQ/rabbitMQInstance";
 import { startWorker } from "./workers/rabbitmqWorker";
+import socket from "./socket/socketServer";
+import routesHandler from "./routers/index";
 
 // Cofig .env file
 dotenv.config();
@@ -36,21 +38,48 @@ server.listen(8087, () => {
 });
 
 // TODO: Create socket server
+async function startSocketServer() {
+  await socket.initSocket(server);
+}
+startSocketServer();
 
+//////////////////////////////////////////////////
+
+// RabbitMQ
 async function handleMqttData() {
   // Receive data from MQTT
-  await connectToMQTT();
+  await mqttClient.connectToMQTT();
 
   // Connect to RabbitMQ to create message queue
   await connectRabbitMQ();
 
   // create a worker to only save data to Mongo every 5 minutes
   await startWorker();
+
+  ////////////////////////////////////////////////////
+
+  // Route handler
+  app.use("/api/v1", routesHandler());
+
+  app.all(
+    "*",
+    (
+      req: express.Request,
+      res: express.Response,
+      next: express.NextFunction
+    ) => {
+      res.status(404).json({
+        message: "No routes found!",
+      });
+    }
+  );
 }
 
 handleMqttData();
 
-// handle exceptio error
+//////////////////////////////////////////////////
+
+// handle exception error
 process.on("SIGINT", async () => {
   process.exit(0);
 });

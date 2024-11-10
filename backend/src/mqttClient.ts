@@ -1,25 +1,27 @@
 import mqtt from "mqtt";
 import { sendToQueue } from "./rabbitMQ/rabbitMQInstance";
 
+let client: mqtt.MqttClient;
+
+const options = {
+  host: "a290b9bc05ee4afdbc18a2fd30f92d28.s1.eu.hivemq.cloud",
+  port: 8884,
+  protocol: "wss",
+  username: "thanh",
+  password: "123",
+  path: "mqtt",
+};
+
+// Connect to the MQTT broker
+client = mqtt.connect(
+  `${options.protocol}://${options.host}:${options.port}/${options.path}`,
+  {
+    username: options.username,
+    password: options.password,
+  }
+);
+
 async function connectToMQTT() {
-  const options = {
-    host: "a290b9bc05ee4afdbc18a2fd30f92d28.s1.eu.hivemq.cloud",
-    port: 8884,
-    protocol: "wss",
-    username: "thanh",
-    password: "123",
-    path: "mqtt",
-  };
-
-  // Connect to the MQTT broker
-  const client = mqtt.connect(
-    `${options.protocol}://${options.host}:${options.port}/${options.path}`,
-    {
-      username: options.username,
-      password: options.password,
-    }
-  );
-
   client.on("connect", () => {
     console.log("Connected to MQTT broker");
 
@@ -88,4 +90,4 @@ async function connectToMQTT() {
   });
 }
 
-export default connectToMQTT;
+export default { connectToMQTT, client };

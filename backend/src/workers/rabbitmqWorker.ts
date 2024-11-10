@@ -103,8 +103,6 @@ async function processMessage(mes: rabbit.ConsumeMessage) {
     motionStatus,
     light,
   };
-
-  console.log(bufferData);
 }
 
 //////////////////////////////////////////////////
