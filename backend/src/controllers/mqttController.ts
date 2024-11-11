@@ -42,10 +42,10 @@ export const lightSchedule = async (
   next: express.NextFunction
 ) => {
   try {
-    const { start, end } = req.body;
+    const { start_time, end_time } = req.body;
     const payload = {
-      start,
-      end,
+      start_time,
+      end_time,
     };
 
     mqttClient.client.publish(topicArr[1], JSON.stringify(payload), (error) => {
