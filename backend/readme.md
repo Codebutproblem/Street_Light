@@ -14,8 +14,12 @@ npm start
 
 ## Route API
 
-Login: http://localhost:8087/api/v1/signin
-SignUp: http://localhost:8087/api/v1/signup
-change Light: http://localhost:8087/api/v1/changeLight
-change schedule: http://localhost:8087/api/v1/changeSchedule
-change brightness: http://localhost:8087/api/v1/changeBrightness
+#### Login: http://localhost:8087/api/v1/signin
+
+#### SignUp: http://localhost:8087/api/v1/signup
+
+#### change Light: http://localhost:8087/api/v1/changeLight
+
+#### change schedule: http://localhost:8087/api/v1/changeSchedule
+
+#### change brightness: http://localhost:8087/api/v1/changeBrightness
