@@ -2,6 +2,8 @@ import React from "react";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { useForm } from "react-hook-form";
 import * as yup from "yup";
+import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 const schema = yup.object({
   firstName: yup.string().required("Please enter your first name"),
@@ -22,13 +24,29 @@ const SignUp = () => {
     mode: "onChange",
   });
   const { errors, isSubmitting, isValid } = formState;
+  const navigate = useNavigate();
   console.log(isSubmitting);
-  const onSubmit = (data) => {
+  const onSubmit = async (data) => {
     if (isValid) {
-      console.log("Send data to backend");
+      try {
+        // Send sign-up data to the backend
+        const response = await axios.post("/api/auth/signup", data);
+
+        console.log("Sign-up successful:", response.data);
+
+        // Redirect to the login page after successful sign-up
+        navigate("/login");
+      } catch (error) {
+        console.error(
+          "Sign-up failed:",
+          error.response?.data?.message || error.message
+        );
+      }
+    } else {
+      console.log("Form is invalid");
     }
-    console.log(data);
   };
+
   return (
     <div className="absolute w-full max-w-[800px] bg-signUp ml-[18%]">
       <form

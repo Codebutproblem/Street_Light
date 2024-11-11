@@ -2,6 +2,8 @@ import React from "react";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { useForm } from "react-hook-form";
 import * as yup from "yup";
+import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 const schema = yup.object({
   email: yup
@@ -20,11 +22,29 @@ const SignIn = () => {
     mode: "onChange",
   });
   const { errors, isSubmitting, isValid } = formState;
+  const navigate = useNavigate();
   console.log(isSubmitting, isValid);
-  const onSubmit = (data) => {
-    console.log("Form is being submitted");
+  const onSubmit = async (data) => {
     if (isValid) {
-      console.log("Send data to backend", data);
+      try {
+        // Send login request to the backend
+        const response = await axios.post("http://localhost:8087/login", data);
+
+        // Assume the backend sends back an authentication token
+        const { token } = response.data;
+
+        // Store the token (e.g., in localStorage)
+        localStorage.setItem("authToken", token);
+
+        console.log("Successfully authenticated", token);
+        // Redirect user or trigger authenticated actions
+        navigate("/");
+      } catch (error) {
+        console.error(
+          "Authentication failed:",
+          error.response?.data?.message || error.message
+        );
+      }
     } else {
       console.log("Form is invalid");
     }

@@ -11,6 +11,76 @@ const Devices = () => {
   const [mqttClient, setMqttClient] = useState(null);
 
   useEffect(() => {
+    // Set up the socket connection
+    const socket = io("http://localhost:8087", {
+      withCredentials: true,
+      reconnection: true,
+      transports: ["websocket"],
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 10000,
+      reconnectionDelayMax: 20000,
+      auth: {
+        token:
+          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3MzE1Yjc2MWZjOTUxNGFkNzM0NDAxNSIsInVzZXJuYW1lIjoia2hvaSIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzMxMjg3OTQwLCJleHAiOjQzMjMyODc5NDB9.20SvjSNfeM5VNRbUteA6kyO0OFj0XeXlJcfHFnfj5Gc",
+      },
+    });
+
+    // Fallback function if the socket is unavailable
+    function triggerFallback() {
+      setFallbackTriggered(true);
+      console.warn("Socket is unavailable!");
+    }
+
+    socket.on("connect", () => {
+      console.log("Connected to socket server");
+      setFallbackTriggered(false);
+    });
+
+    socket.on("disconnect", (reason) => {
+      console.log(`Socket disconnected: ${reason}`);
+      triggerFallback();
+    });
+
+    socket.on("connect_error", (error) => {
+      console.log("Connection error: " + error.message);
+      triggerFallback();
+    });
+
+    socket.on("reconnect_failed", () => {
+      console.log("Reconnect failed");
+      triggerFallback();
+    });
+
+    socket.on("IOT_BH1750", (data) => {
+      console.log("Sensor data received:", data);
+      setSensorData((prev) => [...prev, data]);
+    });
+
+    socket.on("IOT_LED_1", (data) => {
+      console.log("Light data received:", data);
+      setLights((prev) => {
+        const updatedLights = prev.map((light) => {
+          if (light.device === data.device) {
+            return {
+              ...light,
+              ...data,
+            };
+          }
+          return light;
+        });
+        if (!updatedLights.some((light) => light.device === data.device)) {
+          updatedLights.push(data);
+        }
+        return updatedLights;
+      });
+    });
+
+    return () => {
+      socket.disconnect(); // Clean up the socket connection on component unmount
+    };
+  }, []); // Empty array means this effect runs only once when the component mounts
+
+  useEffect(() => {
     const getCurrentLocation = () => {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(

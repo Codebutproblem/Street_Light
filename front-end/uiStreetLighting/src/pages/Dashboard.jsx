@@ -3,7 +3,7 @@ import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   CategoryScale,
-  LinearScale,
+  LinearScale, // Import the necessary Chart.js components
   PointElement,
   LineElement,
   Title,
@@ -13,6 +13,7 @@ import {
   ArcElement,
 } from "chart.js";
 import mqtt from "mqtt";
+import axios from "axios";
 
 // Register the necessary Chart.js components
 ChartJS.register(
@@ -30,9 +31,17 @@ ChartJS.register(
 import { io } from "socket.io-client";
 
 const Dashboard = () => {
-  useEffect(() => {
-    let fallbackTriggered = false;
+  const [lights, setLights] = useState([]);
+  const [sensorData, setSensorData] = useState([]);
+  const [timeSeries, setTimeSeries] = useState([]);
+  const [startTime, setStartTime] = useState("00:00");
+  const [endTime, setEndTime] = useState("00:00");
+  const [mqttClient, setMqttClient] = useState(null);
+  const [fallbackTriggered, setFallbackTriggered] = useState(false);
+  const [brightness, setBrightness] = useState(0);
 
+  useEffect(() => {
+    // Set up the socket connection
     const socket = io("http://localhost:8087", {
       withCredentials: true,
       reconnection: true,
@@ -41,20 +50,20 @@ const Dashboard = () => {
       reconnectionDelay: 10000,
       reconnectionDelayMax: 20000,
       auth: {
-        // Gắn jwt token sau khi đăng nhập thành công vào chỗ này
         token:
           "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3MzE1Yjc2MWZjOTUxNGFkNzM0NDAxNSIsInVzZXJuYW1lIjoia2hvaSIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzMxMjg3OTQwLCJleHAiOjQzMjMyODc5NDB9.20SvjSNfeM5VNRbUteA6kyO0OFj0XeXlJcfHFnfj5Gc",
       },
     });
 
+    // Fallback function if the socket is unavailable
     function triggerFallback() {
-      fallbackTriggered = true;
-      console.warn("Socket is unvailable!");
+      setFallbackTriggered(true);
+      console.warn("Socket is unavailable!");
     }
 
     socket.on("connect", () => {
-      console.log("Connect to socker server");
-      fallbackTriggered = false;
+      console.log("Connected to socket server");
+      setFallbackTriggered(false);
     });
 
     socket.on("disconnect", (reason) => {
@@ -72,57 +81,85 @@ const Dashboard = () => {
       triggerFallback();
     });
 
-    // Nhận data từ socket ở dưới này
     socket.on("IOT_BH1750", (data) => {
-      console.log(data);
+      console.log("Sensor data received:", data);
+
+      const timestamp = new Date().toLocaleTimeString();
+      const newDataPoint = {
+        x: timestamp,
+        y: data.light,
+      };
+
+      setTimeSeries((prev) => [...prev, newDataPoint]);
+      setSensorData((prev) => [...prev, data]);
     });
 
     socket.on("IOT_LED_1", (data) => {
-      console.log(data);
+      console.log("Light data received:", data);
+      setLights((prev) => {
+        const updatedLights = prev.map((light) => {
+          if (light.device === data.device) {
+            return {
+              ...light,
+              ...data,
+            };
+          }
+          return light;
+        });
+        if (!updatedLights.some((light) => light.device === data.device)) {
+          updatedLights.push(data);
+        }
+        return updatedLights;
+      });
     });
-  }, []);
 
-  const [lights, setLights] = useState([
-    {
-      id: 1,
-      name: "Đèn 1",
-      status: false,
-      brightness: 0,
-      lightIntensity: 0,
-      motionStatus: "",
-    },
-    {
-      id: 2,
-      name: "Đèn 2",
-      status: false,
-      brightness: 0,
-      lightIntensity: 0,
-      motionStatus: "",
-    },
-    // {
-    //   id: 3,
-    //   name: "Đèn 3",
-    //   status: false,
-    //   brightness: 0,
-    //   lightIntensity: 0,
-    //   motionStatus: "",
-    // },
-    // {
-    //   id: 4,
-    //   name: "Đèn 4",
-    //   status: false,
-    //   brightness: 0,
-    //   lightIntensity: 0,
-    //   motionStatus: "",
-    // },
-  ]);
+    return () => {
+      socket.disconnect(); // Clean up the socket connection on component unmount
+    };
+  }, []); // Empty array means this effect runs only once when the component mounts
 
-  const [sensorData, setSensorData] = useState([]);
-  const [timeSeries, setTimeSeries] = useState([]);
-  const [startTime, setStartTime] = useState("00:00");
-  const [endTime, setEndTime] = useState("00:00");
-  const [mqttClient, setMqttClient] = useState(null);
+  const toggleLight = (device) => {
+    let updatedStatus; // Define the updatedStatus here
 
+    // Toggle light status immediately in the UI (optimistic update)
+    setLights((prev) => {
+      const updatedLights = prev.map((light) => {
+        if (light.device === device) {
+          updatedStatus = light.status === "on" ? "off" : "on"; // Set updatedStatus here
+          return { ...light, status: updatedStatus };
+        }
+        return light;
+      });
+      return updatedLights;
+    });
+
+    // Send request to change light status
+    axios
+      .post("http://localhost:8087/api/v1/changeLight", {
+        status: updatedStatus,
+      })
+      .then(() => {
+        // Emit socket event if the API request succeeds
+        console.log("SUCCESS");
+        // socket.emit("toggle_light", { device, status: updatedStatus });
+      })
+      .catch((error) => {
+        // If there's an error, revert the UI change
+        console.error("Error changing light status:", error);
+        setLights((prev) => {
+          const updatedLights = prev.map((light) => {
+            if (light.device === device) {
+              const currentStatus = light.status === "on" ? "off" : "on";
+              return { ...light, status: currentStatus }; // Revert change
+            }
+            return light;
+          });
+          return updatedLights;
+        });
+      });
+  };
+
+  // Handle start and end time changes
   const handleStartTimeChange = (e) => {
     setStartTime(e.target.value);
   };
@@ -131,100 +168,89 @@ const Dashboard = () => {
     setEndTime(e.target.value);
   };
 
-  const toggleLight = (id) => {
-    setLights((prev) => {
-      return prev.map((light) => {
-        if (id === light.id) {
-          return {
-            ...light,
-            status: !light.status,
-          };
-        }
-        return light;
-      });
-    });
+  const handleBrightness = (e) => {
+    setBrightness(e.target.value);
   };
+  // useEffect(() => {
+  //   const options = {
+  //     host: "a290b9bc05ee4afdbc18a2fd30f92d28.s1.eu.hivemq.cloud",
+  //     port: 8884,
+  //     protocol: "wss",
+  //     username: "thanh",
+  //     password: "123",
+  //     path: "mqtt",
+  //   };
 
-  useEffect(() => {
-    const options = {
-      host: "a290b9bc05ee4afdbc18a2fd30f92d28.s1.eu.hivemq.cloud",
-      port: 8884,
-      protocol: "wss",
-      username: "thanh",
-      password: "123",
-      path: "mqtt",
-    };
+  //   // Connect to the MQTT broker
+  //   const client = mqtt.connect(
+  //     `${options.protocol}://${options.host}:${options.port}/${options.path}`,
+  //     {
+  //       username: options.username,
+  //       password: options.password,
+  //     }
+  //   );
 
-    // Connect to the MQTT broker
-    const client = mqtt.connect(
-      `${options.protocol}://${options.host}:${options.port}/${options.path}`,
-      {
-        username: options.username,
-        password: options.password,
-      }
-    );
+  //   setMqttClient(client);
 
-    setMqttClient(client);
+  //   client.on("connect", () => {
+  //     const topics = ["esp32/Light_Data_BH1750", "esp32/led_1", "esp32/led_2"];
 
-    client.on("connect", () => {
-      const topics = ["esp32/Light_Data_BH1750", "esp32/led_1", "esp32/led_2"];
+  //     client.subscribe(topics, (err) => {
+  //       if (err) {
+  //         console.error("Error subscribing to topics:", err);
+  //       } else {
+  //         console.log("Successfully subscribed to topics:", topics);
+  //       }
+  //     });
+  //   });
 
-      client.subscribe(topics, (err) => {
-        if (err) {
-          console.error("Error subscribing to topics:", err);
-        } else {
-          console.log("Successfully subscribed to topics:", topics);
-        }
-      });
-    });
+  //   client.on("message", (topic, message) => {
+  //     try {
+  //       const data = JSON.parse(message.toString());
+  //       const currentTime = new Date().toLocaleTimeString();
 
-    client.on("message", (topic, message) => {
-      try {
-        const data = JSON.parse(message.toString());
-        const currentTime = new Date().toLocaleTimeString();
+  //       if (topic === "esp32/Light_Data_BH1750") {
+  //         setSensorData((prevData) => [
+  //           ...prevData,
+  //           { time: currentTime, value: data.light },
+  //         ]);
+  //         setTimeSeries((prevSeries) => [
+  //           ...prevSeries.slice(-9),
+  //           { x: currentTime, y: data.light },
+  //         ]);
+  //       } else if (topic.startsWith("esp32/led")) {
+  //         const ledNumber = parseInt(
+  //           topic.split("/")[1].replace("led_", ""),
+  //           10
+  //         );
 
-        if (topic === "esp32/Light_Data_BH1750") {
-          setSensorData((prevData) => [
-            ...prevData,
-            { time: currentTime, value: data.light },
-          ]);
-          setTimeSeries((prevSeries) => [
-            ...prevSeries.slice(-9),
-            { x: currentTime, y: data.light },
-          ]);
-        } else if (topic.startsWith("esp32/led")) {
-          const ledNumber = parseInt(
-            topic.split("/")[1].replace("led_", ""),
-            10
-          );
+  //         setLights((prevLights) =>
+  //           prevLights.map((light) => {
+  //             console.log(light?.motionStatus);
+  //             if (light.id === ledNumber) {
+  //               return {
+  //                 ...light,
+  //                 status: data.status === "on",
+  //                 brightness: data.brightness || light.brightness,
+  //                 lightIntensity: data.lightIntensity || light.lightIntensity,
+  //                 motionStatus: data.motionStatus || light.motionStatus,
+  //               };
+  //             }
+  //             return light;
+  //           })
+  //         );
+  //       }
+  //     } catch (error) {
+  //       console.error("Error processing message:", error);
+  //     }
+  //   });
 
-          setLights((prevLights) =>
-            prevLights.map((light) => {
-              console.log(light?.motionStatus);
-              if (light.id === ledNumber) {
-                return {
-                  ...light,
-                  status: data.status === "on",
-                  brightness: data.brightness || light.brightness,
-                  lightIntensity: data.lightIntensity || light.lightIntensity,
-                  motionStatus: data.motionStatus || light.motionStatus,
-                };
-              }
-              return light;
-            })
-          );
-        }
-      } catch (error) {
-        console.error("Error processing message:", error);
-      }
-    });
-
-    return () => {
-      if (client) {
-        client.end();
-      }
-    };
-  }, []);
+  //   return () => {
+  //     if (client) {
+  //       client.end();
+  //     }
+  //   };
+  // }, []);
 
   const chartData = {
     labels: timeSeries.map((data) => data?.x),
@@ -232,8 +258,8 @@ const Dashboard = () => {
       {
         label: "Sensor Data",
         data: timeSeries.map((data) => data?.y),
-        backgroundColor: "rgba(54, 162, 235, 0.2)", // Light blue
-        borderColor: "rgba(54, 162, 235, 1)", // Dark blue
+        backgroundColor: "rgba(54, 162, 235, 0.2)",
+        borderColor: "rgba(54, 162, 235, 1)",
         borderWidth: 2,
         fill: true,
       },
@@ -318,7 +344,7 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="overflow-scroll">
+    <div className="">
       <h1 className="text-3xl font-medium mb-10">Dashboard</h1>
 
       <div className="grid grid-cols-2 gap-10 ml-6">
@@ -369,23 +395,25 @@ const Dashboard = () => {
 
         <div className="light-controls flex-1 p-6 bg-[hsl(221.25deg_25.81%_12.16%)] rounded-lg border-2 border-[hsl(221.74deg_25.84%_17.45%)] shadow-md">
           <h2 className="text-xl font-normal mb-4">Điều khiển đèn</h2>
-          {lights.map((light) => {
+          {lights.map((light, index) => {
             return (
-              <div key={light.id} className="flex flex-col gap-y-4 mb-6">
+              <div key={index} className="flex flex-col gap-y-4 mb-6">
                 <div className="flex flex-row gap-x-4 items-center">
-                  <h3 className="text-xl font-light text-gray-100">
-                    {light.name}
+                  <h3 className="text-xl font-normal uppercase text-gray-100">
+                    {light.device}
                   </h3>
 
                   <button
-                    className={`relative inline-flex items-center p-2 rounded-full w-16 h-8 transition-colors duration-300 ease-in-out ${
-                      light.status ? "bg-green-500" : "bg-gray-300"
+                    className={`relative inline-flex items-center p-2 rounded-full w-16 h-8 transition-all duration-300 ease-in-out ${
+                      light.status === "on" ? "bg-green-500" : "bg-gray-300"
                     }`}
-                    onClick={() => toggleLight(light.id)}
+                    onClick={() => toggleLight(light.device)}
                   >
                     <span
                       className={`absolute top-[2px] left-[2px] transition-transform duration-300 ease-in-out w-7 h-7 rounded-full bg-white transform ${
-                        light.status ? "translate-x-8" : "translate-x-1"
+                        light.status === "on"
+                          ? "translate-x-8"
+                          : "translate-x-1"
                       }`}
                     />
                   </button>
@@ -397,7 +425,7 @@ const Dashboard = () => {
                         light.status ? "text-green-500" : "text-red-500"
                       }
                     >
-                      {light.status ? "Bật" : "Tắt"}
+                      {light.status === "on" ? "Bật" : "Tắt"}
                     </span>
                   </p>
                 </div>
@@ -406,8 +434,16 @@ const Dashboard = () => {
                 <div className="flex flex-col gap-y-2 text-gray-200">
                   <p>
                     <strong>Độ sáng: </strong>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={light.brightness}
+                      onChange={handleBrightness}
+                    />
                     {light.brightness}
                   </p>
+
                   <p>
                     <strong>Cường độ ánh sáng: </strong>
                     {light.lightIntensity}

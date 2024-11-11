@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "docker:start": "docker-compose up -d",
+    "docker:start": "docker compose up -d",
     "docker:stop": "docker-compose down",
     "start": "npm run docker:start && nodemon",
     "start:prod": "pm2 start ./src/index.ts --name overflow-api --interpreter ts-node",
