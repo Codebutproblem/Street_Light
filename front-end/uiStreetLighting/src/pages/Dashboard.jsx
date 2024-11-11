@@ -27,7 +27,61 @@ ChartJS.register(
   ArcElement
 );
 
+import { io } from "socket.io-client";
+
 const Dashboard = () => {
+  useEffect(() => {
+    let fallbackTriggered = false;
+
+    const socket = io("http://localhost:8087", {
+      withCredentials: true,
+      reconnection: true,
+      transports: ["websocket"],
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 10000,
+      reconnectionDelayMax: 20000,
+      auth: {
+        // Gắn jwt token sau khi đăng nhập thành công vào chỗ này
+        token:
+          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3MzE1Yjc2MWZjOTUxNGFkNzM0NDAxNSIsInVzZXJuYW1lIjoia2hvaSIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzMxMjg3OTQwLCJleHAiOjQzMjMyODc5NDB9.20SvjSNfeM5VNRbUteA6kyO0OFj0XeXlJcfHFnfj5Gc",
+      },
+    });
+
+    function triggerFallback() {
+      fallbackTriggered = true;
+      console.warn("Socket is unvailable!");
+    }
+
+    socket.on("connect", () => {
+      console.log("Connect to socker server");
+      fallbackTriggered = false;
+    });
+
+    socket.on("disconnect", (reason) => {
+      console.log(`Socket disconnected: ${reason}`);
+      triggerFallback();
+    });
+
+    socket.on("connect_error", (error) => {
+      console.log("Connection error: " + error.message);
+      triggerFallback();
+    });
+
+    socket.on("reconnect_failed", () => {
+      console.log("Reconnect failed");
+      triggerFallback();
+    });
+
+    // Nhận data từ socket ở dưới này
+    socket.on("IOT_BH1750", (data) => {
+      console.log(data);
+    });
+
+    socket.on("IOT_LED_1", (data) => {
+      console.log(data);
+    });
+  }, []);
+
   const [lights, setLights] = useState([
     {
       id: 1,

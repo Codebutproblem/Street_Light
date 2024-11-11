@@ -54,6 +54,8 @@ async function storeDeviceData() {
             device.lightIntensity = data.lightIntensity;
             device.deviceName = data.device;
             device.updatedAt = new Date().toISOString();
+            device.longitude = 105.78749773254788;
+            device.latitude = 20.981335330699494;
 
             await device.save();
             console.log(`device updated: ${deviceName}`);
@@ -64,6 +66,8 @@ async function storeDeviceData() {
               brightness: data.brightness || 0,
               lightIntensity: data.lightIntensity || 0,
               device: data.device,
+              longitude: 105.78749773254788,
+              latitude: 20.981335330699494,
             });
 
             await newDevice.save();

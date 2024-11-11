@@ -1,5 +1,7 @@
 import mqtt from "mqtt";
 import { sendToQueue } from "./rabbitMQ/rabbitMQInstance";
+import socket from "./socket/socketServer";
+import { DefaultEventsMap, Server } from "socket.io";
 
 let client: mqtt.MqttClient;
 
@@ -22,6 +24,13 @@ client = mqtt.connect(
 );
 
 async function connectToMQTT() {
+  const io = socket.getSocketIO() as Server<
+    DefaultEventsMap,
+    DefaultEventsMap,
+    DefaultEventsMap,
+    any
+  >;
+
   client.on("connect", () => {
     console.log("Connected to MQTT broker");
 
@@ -37,6 +46,11 @@ async function connectToMQTT() {
   });
 
   client.on("message", (topic, message) => {
+    const gps = {
+      Latitude: 20.981335,
+      Longitude: 105.787498,
+    };
+
     try {
       // console.log("topic: " + topic);
       // console.log("message: " + message);
@@ -65,7 +79,14 @@ async function connectToMQTT() {
           payload.device = device;
           payload.motherboard = motherboard;
 
+          // Send the message to rabbitMQ
           sendToQueue(payload);
+
+          // Send data to client with socket
+          io.emit("IOT_BH1750", {
+            ...payload,
+            ...gps,
+          });
           break;
         case "esp32/led_1":
           payload.device = device;
@@ -77,6 +98,12 @@ async function connectToMQTT() {
 
           // Send the message to rabbitMQ
           sendToQueue(payload);
+
+          // Send data to client with socket
+          io.emit("IOT_LED_1", {
+            ...payload,
+            ...gps,
+          });
           break;
         case "esp32/led_2":
           break;

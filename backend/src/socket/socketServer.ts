@@ -1,14 +1,13 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { Server, Socket } from "socket.io";
+import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
 import { JWT_SECRET } from "../constants/jwt";
 
 let io;
 
 const initSocket = async (server) => {
-  // Initialize the socket server
   io = await new Server(server, {
     cors: {
       origin: "*",
@@ -24,7 +23,6 @@ const initSocket = async (server) => {
     "--------- Socket.IO server initialized and listening for connections ---------"
   );
 
-  // Validate the connection authentication
   io.use((socket, next) => {
     const token = socket.handshake.auth.token;
 
@@ -32,18 +30,12 @@ const initSocket = async (server) => {
       jwt.verify(token, JWT_SECRET, (err, decoded) => {
         if (err) {
           console.log(
-            "----------- Wrong token! Socket is not connected --------------------"
+            "----------- Wrong token! Socket is not connected -----------"
           );
           socket.disconnect();
           return next(new Error("Invalid token"));
         }
-
-        // Attach the user information to the socket object
         socket.user = decoded;
-        console.log(
-          "--------- Socket.IO server initialized and listening for connections ---------",
-          socket.user
-        );
         next();
       });
     } else {
@@ -52,44 +44,33 @@ const initSocket = async (server) => {
     }
   });
 
-  // Handle new connections
   io.on("connection", (socket) => {
-    console.log(
-      "==================== User connected =================== " + socket.id
-    );
-
-    // Handle user-specific rooms (by id)
+    console.log("User connected: " + socket.id);
     if (socket.user && socket.user.id) {
       socket.join(`room_${socket.user.id}`);
-      console.log(
-        `==================== User with socket ${socket.id} joined room room_${socket.user.id}`
-      );
+      console.log(`User joined room room_${socket.user.id}`);
     }
 
-    // Logging when user disconnects
     socket.on("disconnect", () => {
-      console.log(
-        "==================== User disconnected =================== " +
-          socket.id
-      );
-      if (socket.user) {
-        if (socket.user.id) {
-          socket.leave(socket.user.id);
-          console.log(
-            `==================== User with socket ${socket.id} left room room_${socket.user.id}`
-          );
-        }
+      console.log("User disconnected: " + socket.id);
+      if (socket.user && socket.user.id) {
+        socket.leave(`room_${socket.user.id}`);
       }
     });
   });
+
+  return io;
 };
 
-// Function to get the Socket.IO instance
+// Accessor for other modules to get the `io` instance
 const getSocketIO = () => {
+  if (!io) {
+    throw new Error("Socket.IO is not initialized. Call initSocket first.");
+  }
   return io;
 };
 
 export default {
-  getSocketIO,
   initSocket,
+  getSocketIO,
 };

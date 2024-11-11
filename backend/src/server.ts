@@ -37,12 +37,6 @@ server.listen(8087, () => {
   console.log("Server is running on port 8087");
 });
 
-// TODO: Create socket server
-async function startSocketServer() {
-  await socket.initSocket(server);
-}
-startSocketServer();
-
 //////////////////////////////////////////////////
 
 // RabbitMQ
@@ -75,9 +69,16 @@ async function handleMqttData() {
   );
 }
 
-handleMqttData();
-
 //////////////////////////////////////////////////
+
+// TODO: Create socket server
+async function startSocketServer() {
+  await socket.initSocket(server);
+  await handleMqttData();
+}
+startSocketServer();
+
+///////////////////////////////////////
 
 // handle exception error
 process.on("SIGINT", async () => {
