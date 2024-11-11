@@ -1,11 +1,18 @@
-import { Schema } from "mongoose";
+import mongoose, { Schema, Model } from "mongoose";
+import { Document, Types } from "mongoose";
 
-const mongoose = require("mongoose");
+export interface IUser extends Document {
+  id: string;
+  username: string;
+  password: string;
+  role: string;
+  devices: Types.ObjectId[];
+}
 
-const userSchema = new Schema({
+const userSchema = new Schema<IUser>({
   id: {
     type: String,
-    default: () => new mongoose.Types.ObjectId(),
+    default: () => new mongoose.Types.ObjectId().toString(),
   },
   username: {
     type: String,
@@ -18,6 +25,8 @@ const userSchema = new Schema({
   },
   role: {
     type: String,
+    enum: ["user", "admin"],
+    default: "user",
     required: true,
   },
   devices: [
@@ -28,6 +37,6 @@ const userSchema = new Schema({
   ],
 });
 
-const User = mongoose.model("User", userSchema, "User");
+const User: Model<IUser> = mongoose.model<IUser>("User", userSchema, "User");
 
 export default User;

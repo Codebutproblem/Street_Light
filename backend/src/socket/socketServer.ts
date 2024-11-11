@@ -3,8 +3,7 @@
 
 import { Server, Socket } from "socket.io";
 import jwt from "jsonwebtoken";
-
-const JWT_SECRET = "Sk8im+3icclpjK0rR2emiQ==";
+import { JWT_SECRET } from "../constants/jwt";
 
 let io;
 
@@ -59,11 +58,11 @@ const initSocket = async (server) => {
       "==================== User connected =================== " + socket.id
     );
 
-    // Handle user-specific rooms (by userID)
+    // Handle user-specific rooms (by id)
     if (socket.user && socket.user.id) {
-      socket.join(`${CONST.SOCKET_SEND.ROOM}${socket.user.userID}`);
+      socket.join(`room_${socket.user.id}`);
       console.log(
-        `==================== User with socket ${socket.id} joined room ${CONST.SOCKET_SEND.ROOM}${socket.user.userID}`
+        `==================== User with socket ${socket.id} joined room room_${socket.user.id}`
       );
     }
 
@@ -74,10 +73,10 @@ const initSocket = async (server) => {
           socket.id
       );
       if (socket.user) {
-        if (socket.user.userID) {
-          socket.leave(socket.user.userID);
+        if (socket.user.id) {
+          socket.leave(socket.user.id);
           console.log(
-            `==================== User with socket ${socket.id} left room ${CONST.SOCKET_SEND.ROOM}${socket.user.userID}`
+            `==================== User with socket ${socket.id} left room room_${socket.user.id}`
           );
         }
       }
