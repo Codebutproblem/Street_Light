@@ -39,6 +39,7 @@ const Dashboard = () => {
   const [mqttClient, setMqttClient] = useState(null);
   const [fallbackTriggered, setFallbackTriggered] = useState(false);
   const [brightness, setBrightness] = useState(0);
+  const [statusLight, setStatusLight] = useState("on");
 
   useEffect(() => {
     // Set up the socket connection
@@ -119,14 +120,13 @@ const Dashboard = () => {
   }, []); // Empty array means this effect runs only once when the component mounts
 
   const toggleLight = (device) => {
-    let updatedStatus; // Define the updatedStatus here
-
     // Toggle light status immediately in the UI (optimistic update)
     setLights((prev) => {
       const updatedLights = prev.map((light) => {
         if (light.device === device) {
-          updatedStatus = light.status === "on" ? "off" : "on"; // Set updatedStatus here
-          return { ...light, status: updatedStatus };
+          const status = statusLight === "on" ? "off" : "on"; // Set updatedStatus here
+          setStatusLight(status);
+          return { ...light, status };
         }
         return light;
       });
@@ -136,7 +136,7 @@ const Dashboard = () => {
     // Send request to change light status
     axios
       .post("http://localhost:8087/api/v1/changeLight", {
-        status: updatedStatus,
+        status: statusLight,
       })
       .then(() => {
         // Emit socket event if the API request succeeds
@@ -146,111 +146,83 @@ const Dashboard = () => {
       .catch((error) => {
         // If there's an error, revert the UI change
         console.error("Error changing light status:", error);
-        setLights((prev) => {
-          const updatedLights = prev.map((light) => {
-            if (light.device === device) {
-              const currentStatus = light.status === "on" ? "off" : "on";
-              return { ...light, status: currentStatus }; // Revert change
-            }
-            return light;
-          });
-          return updatedLights;
-        });
       });
   };
 
   // Handle start and end time changes
   const handleStartTimeChange = (e) => {
-    setStartTime(e.target.value);
+    const newStartTime = e.target.value;
+
+    const currentEndTime = lights.length > 0 ? lights[0]?.endTime : null; // or any other logic to get the end time
+
+    // Update start time for all lights
+    setLights((prevLights) =>
+      prevLights.map((light) => ({
+        ...light,
+        startTime: newStartTime,
+      }))
+    );
+
+    axios
+      .post("http://localhost:8087/api/v1/changeSchedule", {
+        start_time: newStartTime,
+        end_time: currentEndTime || "00:00",
+      })
+      .then((response) => {
+        console.log("SUCCESS: Start time updated for all lights");
+      })
+      .catch((error) => {
+        console.error("Error changing start time:", error);
+      });
   };
 
   const handleEndTimeChange = (e) => {
-    setEndTime(e.target.value);
+    const newEndTime = e.target.value;
+
+    // Update end time for all lights
+    setLights((prevLights) =>
+      prevLights.map((light) => ({
+        ...light,
+        endTime: newEndTime, // Set the same end time for all lights
+      }))
+    );
+
+    // You can also send the updated end time to the server if needed
+    axios
+      .post("http://localhost:8087/api/v1/changeSchedule", {
+        endTime: newEndTime,
+      })
+      .then((response) => {
+        console.log("SUCCESS: End time updated for all lights");
+      })
+      .catch((error) => {
+        console.error("Error changing end time:", error);
+      });
   };
 
-  const handleBrightness = (e) => {
-    setBrightness(e.target.value);
+  const handleBrightness = (e, device) => {
+    const newBrightness = e.target.value;
+
+    // Update brightness for the specific light in the state
+    setLights((prevLights) =>
+      prevLights.map((light) =>
+        light.device === device
+          ? { ...light, brightness: newBrightness }
+          : light
+      )
+    );
+
+    axios
+      .post("http://localhost:8087/api/v1/changeBrightness", {
+        brightness: newBrightness,
+      })
+      .then((response) => {
+        console.log("SUCCESS: Brightness updated for all lights");
+      })
+      .catch((error) => {
+        console.error("Error changing brightness:", error);
+      });
   };
-  // useEffect(() => {
-  //   const options = {
-  //     host: "a290b9bc05ee4afdbc18a2fd30f92d28.s1.eu.hivemq.cloud",
-  //     port: 8884,
-  //     protocol: "wss",
-  //     username: "thanh",
-  //     password: "123",
-  //     path: "mqtt",
-  //   };
-
-  //   // Connect to the MQTT broker
-  //   const client = mqtt.connect(
-  //     `${options.protocol}://${options.host}:${options.port}/${options.path}`,
-  //     {
-  //       username: options.username,
-  //       password: options.password,
-  //     }
-  //   );
-
-  //   setMqttClient(client);
-
-  //   client.on("connect", () => {
-  //     const topics = ["esp32/Light_Data_BH1750", "esp32/led_1", "esp32/led_2"];
-
-  //     client.subscribe(topics, (err) => {
-  //       if (err) {
-  //         console.error("Error subscribing to topics:", err);
-  //       } else {
-  //         console.log("Successfully subscribed to topics:", topics);
-  //       }
-  //     });
-  //   });
-
-  //   client.on("message", (topic, message) => {
-  //     try {
-  //       const data = JSON.parse(message.toString());
-  //       const currentTime = new Date().toLocaleTimeString();
-
-  //       if (topic === "esp32/Light_Data_BH1750") {
-  //         setSensorData((prevData) => [
-  //           ...prevData,
-  //           { time: currentTime, value: data.light },
-  //         ]);
-  //         setTimeSeries((prevSeries) => [
-  //           ...prevSeries.slice(-9),
-  //           { x: currentTime, y: data.light },
-  //         ]);
-  //       } else if (topic.startsWith("esp32/led")) {
-  //         const ledNumber = parseInt(
-  //           topic.split("/")[1].replace("led_", ""),
-  //           10
-  //         );
-
-  //         setLights((prevLights) =>
-  //           prevLights.map((light) => {
-  //             console.log(light?.motionStatus);
-  //             if (light.id === ledNumber) {
-  //               return {
-  //                 ...light,
-  //                 status: data.status === "on",
-  //                 brightness: data.brightness || light.brightness,
-  //                 lightIntensity: data.lightIntensity || light.lightIntensity,
-  //                 motionStatus: data.motionStatus || light.motionStatus,
-  //               };
-  //             }
-  //             return light;
-  //           })
-  //         );
-  //       }
-  //     } catch (error) {
-  //       console.error("Error processing message:", error);
-  //     }
-  //   });
-
-  //   return () => {
-  //     if (client) {
-  //       client.end();
-  //     }
-  //   };
-  // }, []);
 
   const chartData = {
     labels: timeSeries.map((data) => data?.x),
@@ -439,7 +411,7 @@ const Dashboard = () => {
                       min="0"
                       max="100"
                       value={light.brightness}
-                      onChange={handleBrightness}
+                      onChange={(e) => handleBrightness(e, light.device)}
                     />
                     {light.brightness}
                   </p>

@@ -15,6 +15,8 @@ export const toggleLight = async (
 ) => {
   try {
     const { status } = req.body;
+    console.log(req.body);
+    console.log(status);
     const payload = {
       status,
     };
