@@ -1,23 +1,24 @@
-import { Schema, Document, model } from "mongoose";
+import { Schema, Document, model, Types } from "mongoose";
 import mongoose from "mongoose";
 
 interface ISchedule extends Document {
-  start_time: Date;
-  end_time: Date;
-  devices: mongoose.Types.ObjectId[];
+  start_time: string;
+  end_time: string;
+  createdAt: string;
+  devices: Types.ObjectId[];
 }
 
-const scheduleSchema = new Schema<ISchedule>({
+const scheduleSchema: Schema<ISchedule> = new Schema({
   id: {
     type: String,
-    default: () => new mongoose.Types.ObjectId(),
+    default: () => new mongoose.Types.ObjectId().toString(),
   },
   start_time: {
-    type: Date,
+    type: String,
     required: true,
   },
   end_time: {
-    type: Date,
+    type: String,
     required: true,
   },
   devices: [
@@ -26,6 +27,11 @@ const scheduleSchema = new Schema<ISchedule>({
       ref: "Device",
     },
   ],
+  createdAt: {
+    type: String,
+    required: true,
+    default: new Date().toISOString(),
+  },
 });
 
 const Schedule = model<ISchedule>("Schedule", scheduleSchema, "Schedule");

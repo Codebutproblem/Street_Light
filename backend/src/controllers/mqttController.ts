@@ -1,5 +1,6 @@
 import express from "express";
 import mqttClient from "../mqttClient";
+import Schedule from "../model/scheduleModel";
 
 const topicArr = [
   "esp32/led_1/change_status",
@@ -48,16 +49,26 @@ export const lightSchedule = async (
       end_time,
     };
 
-    mqttClient.client.publish(topicArr[1], JSON.stringify(payload), (error) => {
-      if (error) {
-        console.error("Publish error:", error);
-        res.status(500).json({
-          message: "Error publishing message",
-        });
-      } else {
-        res.status(200).send({ message: "Message published successfully" });
+    mqttClient.client.publish(
+      topicArr[1],
+      JSON.stringify(payload),
+      async (error) => {
+        if (error) {
+          console.error("Publish error:", error);
+          res.status(500).json({
+            message: "Error publishing message",
+          });
+        } else {
+          res.status(200).send({ message: "Message published successfully" });
+          const schedule = new Schedule({
+            start_time,
+            end_time,
+          });
+
+          await schedule.save();
+        }
       }
-    });
+    );
   } catch (err) {
     console.log(err);
     res.status(500).json({
@@ -87,6 +98,20 @@ export const changeBrightness = async (
         res.status(200).send({ message: "Message published successfully" });
       }
     });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({
+      message: "Error publishing message",
+    });
+  }
+};
+
+export const getAllSchedule = async (
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) => {
+  try {
   } catch (err) {
     console.log(err);
     res.status(500).json({
