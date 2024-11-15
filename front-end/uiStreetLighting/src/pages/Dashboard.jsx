@@ -3,7 +3,7 @@ import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   CategoryScale,
-  LinearScale, // Import the necessary Chart.js components
+  LinearScale,
   PointElement,
   LineElement,
   Title,
@@ -12,10 +12,8 @@ import {
   Filler,
   ArcElement,
 } from "chart.js";
-import mqtt from "mqtt";
 import axios from "axios";
 
-// Register the necessary Chart.js components
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -34,12 +32,11 @@ const Dashboard = () => {
   const [lights, setLights] = useState([]);
   const [sensorData, setSensorData] = useState([]);
   const [timeSeries, setTimeSeries] = useState([]);
-  const [startTime, setStartTime] = useState("00:00");
-  const [endTime, setEndTime] = useState("00:00");
-  const [mqttClient, setMqttClient] = useState(null);
   const [fallbackTriggered, setFallbackTriggered] = useState(false);
-  const [brightness, setBrightness] = useState(0);
   const [statusLight, setStatusLight] = useState("on");
+  const [timeRange, setTimeRange] = useState("08:00 - 17:00");
+  const [isValid, setIsValid] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     // Set up the socket connection
@@ -117,14 +114,13 @@ const Dashboard = () => {
     return () => {
       socket.disconnect(); // Clean up the socket connection on component unmount
     };
-  }, []); // Empty array means this effect runs only once when the component mounts
+  }, []);
 
   const toggleLight = (device) => {
-    // Toggle light status immediately in the UI (optimistic update)
     setLights((prev) => {
       const updatedLights = prev.map((light) => {
         if (light.device === device) {
-          const status = statusLight === "on" ? "off" : "on"; // Set updatedStatus here
+          const status = statusLight === "on" ? "off" : "on";
           setStatusLight(status);
           return { ...light, status };
         }
@@ -133,77 +129,72 @@ const Dashboard = () => {
       return updatedLights;
     });
 
-    // Send request to change light status
     axios
       .post("http://localhost:8087/api/v1/changeLight", {
         status: statusLight,
       })
       .then(() => {
-        // Emit socket event if the API request succeeds
         console.log("SUCCESS");
-        // socket.emit("toggle_light", { device, status: updatedStatus });
       })
       .catch((error) => {
-        // If there's an error, revert the UI change
         console.error("Error changing light status:", error);
       });
   };
 
-  // Handle start and end time changes
-  const handleStartTimeChange = (e) => {
-    const newStartTime = e.target.value;
-
-    const currentEndTime = lights.length > 0 ? lights[0]?.endTime : null; // or any other logic to get the end time
-
-    // Update start time for all lights
-    setLights((prevLights) =>
-      prevLights.map((light) => ({
-        ...light,
-        startTime: newStartTime,
-      }))
-    );
-
-    axios
-      .post("http://localhost:8087/api/v1/changeSchedule", {
-        start_time: newStartTime,
-        end_time: currentEndTime || "00:00",
-      })
-      .then((response) => {
-        console.log("SUCCESS: Start time updated for all lights");
-      })
-      .catch((error) => {
-        console.error("Error changing start time:", error);
-      });
+  const handleTimeRangeChange = (event) => {
+    const value = event.target.value;
+    setTimeRange(value);
   };
 
-  const handleEndTimeChange = (e) => {
-    const newEndTime = e.target.value;
+  const validateTimeRange = () => {
+    const timePattern = /^([0-9]{2}):([0-9]{2})\s*-\s*([0-9]{2}):([0-9]{2})$/;
+    const match = timeRange.match(timePattern);
 
-    // Update end time for all lights
-    setLights((prevLights) =>
-      prevLights.map((light) => ({
-        ...light,
-        endTime: newEndTime, // Set the same end time for all lights
-      }))
-    );
+    if (!match) {
+      setIsValid(false);
+      alert("Please enter a valid time range (e.g., HH:mm - HH:mm).");
+      return false;
+    }
 
-    // You can also send the updated end time to the server if needed
-    axios
-      .post("http://localhost:8087/api/v1/changeSchedule", {
-        endTime: newEndTime,
-      })
-      .then((response) => {
-        console.log("SUCCESS: End time updated for all lights");
-      })
-      .catch((error) => {
-        console.error("Error changing end time:", error);
-      });
+    const startTime = match[1] + ":" + match[2];
+    const endTime = match[3] + ":" + match[4];
+
+    if (startTime >= endTime) {
+      setIsValid(false);
+      alert("Start time cannot be later than or equal to end time.");
+      return false;
+    }
+
+    setIsValid(true);
+    return { startTime, endTime };
+  };
+
+  const handleSubmit = async () => {
+    const validTimes = validateTimeRange();
+    if (!validTimes) return;
+
+    setIsSubmitting(true);
+
+    setTimeout(() => {
+      axios
+        .post("http://localhost:8087/api/v1/changeSchedule", {
+          start_time: validTimes.startTime,
+          end_time: validTimes.endTime,
+        })
+        .then((response) => {
+          console.log("SUCCESS: time range updated for all lights");
+        })
+        .catch((error) => {
+          console.error("Error changing end time:", error);
+        });
+      setIsSubmitting(false);
+      alert("Data submitted successfully!");
+    }, 2000);
   };
 
   const handleBrightness = (e, device) => {
     const newBrightness = e.target.value;
 
-    // Update brightness for the specific light in the state
     setLights((prevLights) =>
       prevLights.map((light) =>
         light.device === device
@@ -316,7 +307,7 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="">
+    <div className="flex-1">
       <h1 className="text-3xl font-medium mb-10">Dashboard</h1>
 
       <div className="grid grid-cols-2 gap-10 ml-6">
@@ -325,44 +316,48 @@ const Dashboard = () => {
             Điều chỉnh thời gian bắt đầu và kết thúc cho tất cả các đèn
           </h2>
 
-          <div className="flex space-x-4">
-            <div>
-              <label
-                htmlFor="startTime"
-                className="block text-lg font-normal mb-2"
+          <div>
+            <label
+              htmlFor="time_range"
+              className="block text-lg font-normal mb-2"
+            >
+              Thời gian (Start - End):
+            </label>
+            <input
+              id="time_range"
+              type="text"
+              value={timeRange}
+              onChange={handleTimeRangeChange}
+              placeholder="HH:mm - HH:mm"
+              className="p-4 bg-[hsl(221.74deg_25.84%_17.45%)] rounded-lg text-xl font-bold text-white"
+            />
+
+            <p className="mt-5 text-lg font-normal">
+              Thời gian bắt đầu: {timeRange.split(" - ")[0]} <br />
+              Thời gian kết thúc: {timeRange.split(" - ")[1]}
+            </p>
+
+            {/* Submit Button */}
+            <div className="mt-4">
+              <button
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className={`p-2 text-white bg-blue-500 rounded-lg ${
+                  isSubmitting ? "cursor-not-allowed" : ""
+                }`}
               >
-                Thời gian bắt đầu:
-              </label>
-              <input
-                id="startTime"
-                type="time"
-                value={startTime}
-                onChange={handleStartTimeChange}
-                className="p-4 bg-[hsl(221.74deg_25.84%_17.45%)] rounded-lg text-xl font-bold text-white"
-              />
+                {isSubmitting ? "Submitting..." : "Submit"}
+              </button>
             </div>
 
-            <div>
-              <label
-                htmlFor="endTime"
-                className="block text-lg font-normal mb-2"
-              >
-                Thời gian kết thúc:
-              </label>
-              <input
-                id="endTime"
-                type="time"
-                value={endTime}
-                onChange={handleEndTimeChange}
-                className="p-4 bg-[hsl(221.74deg_25.84%_17.45%)] rounded-lg text-xl font-bold text-white"
-              />
-            </div>
+            {/* Show error message if the input is invalid */}
+            {!isValid && (
+              <p className="text-red-500 mt-2">
+                Please enter a valid time range (Start time must be earlier than
+                End time).
+              </p>
+            )}
           </div>
-
-          <p className="mt-5 text-lg font-normal">
-            Thời gian bắt đầu: {startTime} <br />
-            Thời gian kết thúc: {endTime}
-          </p>
         </div>
 
         <div className="light-controls flex-1 p-6 bg-[hsl(221.25deg_25.81%_12.16%)] rounded-lg border-2 border-[hsl(221.74deg_25.84%_17.45%)] shadow-md">
@@ -447,7 +442,8 @@ const Dashboard = () => {
           })}
         </div>
       </div>
-      <div className="p-4 m-5 border-2 border-[hsl(221.74deg_25.84%_17.45%)] rounded-lg shadow-md bg-[hsl(221.74deg_25.84%_12%)] max-w-max">
+
+      <div className="ml-6 p-4 mt-10 border-2 border-[hsl(221.74deg_25.84%_17.45%)] rounded-lg shadow-md bg-[hsl(221.74deg_25.84%_12%)]">
         <h2 className="text-xl text-white mb-4 text-center">
           Dữ liệu cảm biến ánh sáng
         </h2>

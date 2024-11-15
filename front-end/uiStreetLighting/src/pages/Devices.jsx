@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import mqtt from "mqtt";
+import { io } from "socket.io-client";
 
 const Devices = () => {
   const [devices, setDevices] = useState([]);
@@ -9,7 +10,8 @@ const Devices = () => {
   const [loading, setLoading] = useState(true);
   const [currentPosition, setCurrentPosition] = useState(null);
   const [mqttClient, setMqttClient] = useState(null);
-
+  const [fallbackTriggered, setFallbackTriggered] = useState(false);
+  const [sensorData, setSensorData] = useState([]);
   useEffect(() => {
     // Set up the socket connection
     const socket = io("http://localhost:8087", {

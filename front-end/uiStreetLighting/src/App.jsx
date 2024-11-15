@@ -3,6 +3,7 @@ import {
   Route,
   Routes,
   useLocation,
+  Navigate,
 } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -21,9 +22,20 @@ import SignUp from "./pages/SignUp";
 import Devices from "./pages/Devices";
 import "./App.css";
 
+// Utility to check authentication status (e.g., check JWT token)
+const isAuthenticated = () => {
+  const token = localStorage.getItem("authToken");
+  return token ? true : false; // Check if token exists
+};
+
+// ProtectedRoute component to wrap routes that require authentication
+const ProtectedRoute = ({ children }) => {
+  return isAuthenticated() ? children : <Navigate to="/signIn" />;
+};
+
 function App() {
   return (
-    <Router future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+    <Router>
       <AppContent />
     </Router>
   );
@@ -32,45 +44,49 @@ function App() {
 function AppContent() {
   const location = useLocation(); // Get the current location (route)
 
-  // Check if the current route is either '/signIn' or '/signUp'
+  // Hide Sidebar for routes '/signIn' and '/signUp'
   const hideSidebar =
     location.pathname === "/signUp" || location.pathname === "/signIn";
 
   return (
     <div className="flex flex-row">
+      {/* Conditionally render the Sidebar */}
       {!hideSidebar && (
         <Sidebar>
-          {/* Sidebar Items with Links for navigation */}
           <SidebarItem
             icon={<LayoutDashboard size={30} />}
             text={"Dashboard"}
-            to="/dashboard" // Set the route to navigate to
+            to="/dashboard"
           />
           <SidebarItem
             icon={<Lightbulb size={30} />}
             text={"Devices"}
-            to="/devices" // Set the route to navigate to
+            to="/devices"
           />
-          <SidebarItem
-            icon={<LogIn size={30} />}
-            text={"Sign Up"}
-            to="/signUp" // Set the route to navigate to
-          />
-          <SidebarItem
-            icon={<LogOut size={30} />}
-            text={"Logout"}
-            to="/signIn" // Set the route to navigate to
-          />
+          {/* Show "Sign Up" or "Log In" depending on authentication status */}
+          {!isAuthenticated() ? (
+            <SidebarItem
+              icon={<LogIn size={30} />}
+              text={"Sign Up"}
+              to="/signUp"
+            />
+          ) : (
+            <SidebarItem
+              icon={<LogOut size={30} />}
+              text={"Logout"}
+              to="/signIn"
+            />
+          )}
           <hr className="my-3" />
           <SidebarItem
             icon={<Settings size={30} />}
             text={"Settings"}
-            to="/settings" // Set the route to navigate to
+            to="/settings"
           />
           <SidebarItem
             icon={<BadgeHelp size={30} />}
             text={"Help"}
-            to="/help" // Set the route to navigate to
+            to="/help"
           />
         </Sidebar>
       )}
@@ -79,13 +95,29 @@ function AppContent() {
       <div
         className={`flex-1 h-screen overflow-hidden p-14 ${
           hideSidebar
-            ? "bg-[#faebd7]"
-            : "bg-[hsl(220deg_25%_14.12%)] text-white"
+            ? "bg-[#faebd7]" // Lighter background for no sidebar
+            : "bg-[hsl(220deg_25%_14.12%)] text-white" // Darker background for sidebar
         } `}
       >
         <Routes>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/devices" element={<Devices />} />
+          {/* Define protected routes that require authentication */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/devices"
+            element={
+              <ProtectedRoute>
+                <Devices />
+              </ProtectedRoute>
+            }
+          />
+          {/* Public routes */}
           <Route path="/signIn" element={<SignIn />} />
           <Route path="/signUp" element={<SignUp />} />
           <Route path="/settings" element={<SettingsPage />} />

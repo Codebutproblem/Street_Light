@@ -5,6 +5,7 @@ import * as yup from "yup";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
+// Validation schema for email and password
 const schema = yup.object({
   email: yup
     .string()
@@ -23,23 +24,35 @@ const SignIn = () => {
   });
   const { errors, isSubmitting, isValid } = formState;
   const navigate = useNavigate();
-  console.log(isSubmitting, isValid);
+
   const onSubmit = async (data) => {
     if (isValid) {
       try {
         // Send login request to the backend
-        const response = await axios.post("http://localhost:8087/login", data);
+        const response = await axios.post(
+          "http://localhost:8087/api/v1/signin",
+          {
+            data,
+          }
+        );
 
-        // Assume the backend sends back an authentication token
+        // Assuming the backend sends back a JWT token
         const { token } = response.data;
 
-        // Store the token (e.g., in localStorage)
-        localStorage.setItem("authToken", token);
+        if (token) {
+          // Store the JWT token in localStorage (or sessionStorage for session-based auth)
+          localStorage.setItem("authToken", token);
 
-        console.log("Successfully authenticated", token);
-        // Redirect user or trigger authenticated actions
-        navigate("/");
+          console.log("Successfully authenticated", token);
+
+          // Set the Authorization header for future API requests (optional)
+          axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+
+          // Redirect to the homepage (or a protected route)
+          navigate("/");
+        }
       } catch (error) {
+        // Handle authentication failure
         console.error(
           "Authentication failed:",
           error.response?.data?.message || error.message
@@ -57,6 +70,7 @@ const SignIn = () => {
         className="relative w-full max-w-[500px] mx-auto p-10 border-4 border-[rgb(4_50_113)] bg-[#fff] text-[rgb(27_27_27)] top-[2.5%] left-[80%] transform rounded-xl"
       >
         <div>
+          {/* Email Input */}
           <div className="flex flex-col gap-4 mb-4">
             <label className="text-sm font-medium" htmlFor="email">
               Email Address
@@ -73,6 +87,7 @@ const SignIn = () => {
             </div>
           </div>
 
+          {/* Password Input */}
           <div className="flex flex-col gap-4 mb-4">
             <label className="text-sm font-medium" htmlFor="password">
               Password
@@ -88,10 +103,14 @@ const SignIn = () => {
               {errors.password?.message}
             </div>
           </div>
+
+          {/* Forgot Password */}
           <span className="text-sm font-normal">
             <a href="#">Forgot password?</a>
           </span>
-          <div className=" flex flex-col items-center">
+
+          {/* Sign In Button and Signup Link */}
+          <div className="flex flex-col items-center">
             <button
               type="submit"
               className={`px-10 py-4 bg-black uppercase text-sm font-medium mt-4 text-white rounded-sm w-full ${
@@ -100,6 +119,7 @@ const SignIn = () => {
             >
               Sign In
             </button>
+
             <div className="flex gap-3 mt-2">
               <span>Don't have an account?</span>
               <a href="/signUp" className="text-[#307517]">
