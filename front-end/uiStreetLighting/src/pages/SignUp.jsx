@@ -5,6 +5,7 @@ import * as yup from "yup";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
+// Define validation schema using yup
 const schema = yup.object({
   firstName: yup.string().required("Please enter your first name"),
   lastName: yup.string().required("Please enter your last name"),
@@ -25,17 +26,33 @@ const SignUp = () => {
   });
   const { errors, isSubmitting, isValid } = formState;
   const navigate = useNavigate();
-  console.log(isSubmitting);
+
+  // Handle form submission
   const onSubmit = async (data) => {
     if (isValid) {
+      console.log(data);
       try {
         // Send sign-up data to the backend
-        const response = await axios.post("/api/auth/signup", data);
+        const response = await axios.post(
+          "http://localhost:8087/api/v1/signup",
+          {
+            username: data.firstName + data.lastName,
+            password: data.password,
+          }
+        );
 
         console.log("Sign-up successful:", response.data);
 
-        // Redirect to the login page after successful sign-up
-        navigate("/login");
+        // Assuming the response contains the JWT token, you can store it in localStorage
+        const { token } = response.data;
+
+        if (token) {
+          // Store the JWT token in localStorage or sessionStorage
+          localStorage.setItem("authToken", token);
+
+          // Redirect to the login page after successful sign-up
+          navigate("/signIn");
+        }
       } catch (error) {
         console.error(
           "Sign-up failed:",
@@ -54,6 +71,7 @@ const SignUp = () => {
         className="relative w-full max-w-[500px] mx-auto p-10 border-4 border-[rgb(4_50_113)] bg-[#fff] text-[rgb(27_27_27)] -top-[30%] left-[80%] transform rounded-xl"
       >
         <div>
+          {/* First Name Input */}
           <div className="flex flex-col gap-4 mb-4">
             <label className="text-sm font-medium" htmlFor="firstName">
               First Name
@@ -70,6 +88,7 @@ const SignUp = () => {
             </div>
           </div>
 
+          {/* Last Name Input */}
           <div className="flex flex-col gap-4 mb-4">
             <label className="text-sm font-medium" htmlFor="lastName">
               Last Name
@@ -86,6 +105,7 @@ const SignUp = () => {
             </div>
           </div>
 
+          {/* Email Input */}
           <div className="flex flex-col gap-4 mb-4">
             <label className="text-sm font-medium" htmlFor="email">
               Email Address
@@ -102,6 +122,7 @@ const SignUp = () => {
             </div>
           </div>
 
+          {/* Password Input */}
           <div className="flex flex-col gap-4 mb-4">
             <label className="text-sm font-medium" htmlFor="password">
               Password

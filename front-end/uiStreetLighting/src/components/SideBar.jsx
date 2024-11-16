@@ -1,14 +1,31 @@
 import { MoreVertical, ChevronLast, ChevronFirst } from "lucide-react";
-import { useContext, createContext, useState } from "react";
+import { useContext, createContext, useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
+import { jwtDecode } from "jwt-decode"; // Corrected import for jwt-decode
 
 const SidebarContext = createContext();
 
 export default function Sidebar({ children }) {
   const [expanded, setExpanded] = useState(true);
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem("authToken");
+
+    if (token) {
+      try {
+        const decodedToken = jwtDecode(token);
+        setUser(decodedToken); // Assuming token has user data like name, email
+      } catch (error) {
+        console.error("Invalid JWT token", error);
+      }
+    }
+  }, []);
 
   return (
-    <aside className={`h-screen ${expanded ? "max-w-[300px]" : "w-fit"} `}>
+    <aside
+      className={`h-screen ${expanded ? "max-w-[300px] w-full" : "w-fit"}`}
+    >
       <nav className="h-full flex flex-col bg-white border-r shadow-sm">
         <div
           className={`flex items-center ${
@@ -34,25 +51,37 @@ export default function Sidebar({ children }) {
           <ul className="flex-1 px-3">{children}</ul>
         </SidebarContext.Provider>
 
-        <div className="border-t flex items-center justify-center p-3">
-          <img
-            src="https://www.svgrepo.com/show/81103/avatar.svg"
-            alt=""
-            className="w-10 h-10 rounded-md"
-          />
-          <div
-            className={`
-              flex justify-between items-center
-              overflow-hidden transition-all ${expanded ? "w-52 ml-3" : "w-0"}
-          `}
-          >
-            <div className="leading-4">
-              <h4 className="font-semibold">Vi Canh</h4>
-              <span className="text-xs text-gray-600">vicanh@gmail.com</span>
+        {/* User info section */}
+        {user ? (
+          <div className="border-t flex items-center justify-center p-3">
+            <img
+              src="https://www.svgrepo.com/show/81103/avatar.svg"
+              alt=""
+              className="w-10 h-10 rounded-md"
+            />
+            <div
+              className={`
+                flex justify-between items-center
+                overflow-hidden transition-all ${expanded ? "w-52 ml-3" : "w-0"}
+            `}
+            >
+              <div className="leading-4">
+                <h4 className="font-semibold">{user.name}</h4>
+                <span className="text-xs text-gray-600">{user.email}</span>
+              </div>
+              <MoreVertical size={20} />
             </div>
-            <MoreVertical size={20} />
           </div>
-        </div>
+        ) : (
+          <div className="border-t flex items-center justify-center p-3">
+            <NavLink
+              to="/signUp"
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg"
+            >
+              Sign Up
+            </NavLink>
+          </div>
+        )}
       </nav>
     </aside>
   );
@@ -69,26 +98,21 @@ export function SidebarItem({ icon, text, alert, to }) {
         transition-colors group
       `}
     >
-      {/* NavLink for active state handling */}
       <NavLink
         to={to}
-        className={
-          ({ isActive }) =>
-            isActive
-              ? "p-3 rounded-lg bg-gradient-to-tr from-indigo-200 to-indigo-100 text-indigo-800 w-full" // Active styles
-              : "p-3 rounded-lg hover:bg-indigo-50 text-gray-600 w-full" // Inactive styles
+        className={({ isActive }) =>
+          isActive
+            ? "p-3 rounded-lg bg-gradient-to-tr from-indigo-200 to-indigo-100 text-indigo-800 w-full"
+            : "p-3 rounded-lg hover:bg-indigo-50 text-gray-600 w-full"
         }
       >
         <span className="flex items-center w-full">
-          {icon && <span className="text-xl">{icon}</span>}{" "}
-          {/* Add a fixed size for the icon */}
+          {icon && <span className="text-xl">{icon}</span>}
           <span
             className={`
             overflow-hidden transition-all 
             ${expanded ? "w-auto ml-3 opacity-100" : "w-0 opacity-0"}
-            ${
-              !expanded ? "max-w-0" : "max-w-full"
-            } /* Max width for text animation */
+            ${!expanded ? "max-w-0" : "max-w-full"}
           `}
           >
             {text}
@@ -96,7 +120,6 @@ export function SidebarItem({ icon, text, alert, to }) {
         </span>
       </NavLink>
 
-      {/* Alert Badge */}
       {alert && (
         <div
           className={`absolute right-2 w-2 h-2 rounded bg-indigo-400 ${
@@ -105,7 +128,6 @@ export function SidebarItem({ icon, text, alert, to }) {
         />
       )}
 
-      {/* Tooltip for collapsed sidebar */}
       {!expanded && (
         <div
           className={`

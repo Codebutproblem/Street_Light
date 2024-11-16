@@ -55,6 +55,10 @@ void check_mqtt_connection() {
 
     if (client.connect(clientId.c_str(), mqtt_username, mqtt_password)) {
       Serial.println("connected");
+      client.subscribe("esp32/led_1/change_status");
+      client.subscribe("esp32/led_1/change_schedule");
+      client.subscribe("esp32/led_1/change_brightness");
+
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
@@ -70,6 +74,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
   for (int i = 0; i < length; i++) {
     receivedData += (char)payload[i];
   }
+  Serial.println("----------------------:" + receivedData);
 
   DynamicJsonDocument doc(1024);
   DeserializationError error = deserializeJson(doc, receivedData);
@@ -83,18 +88,16 @@ void callback(char* topic, byte* payload, unsigned int length) {
     String status = doc["status"].as<String>();
     Serial.println("Received change_status: " + status);
     Serial2.println("change_status=" + status);
-  } 
-  else if (String(topic) == "esp32/led_1/change_schedule") {
+  } else if (String(topic) == "esp32/led_1/change_schedule") {
     String startTime = doc["start_time"].as<String>();
     String endTime = doc["end_time"].as<String>();
     String scheduleData = startTime + ";" + endTime;
     Serial.println("Received change_schedule: " + scheduleData);
     Serial2.println("change_schedule=" + scheduleData);
-  } 
-  else if (String(topic) == "esp32/led_1/change_brightness") {
-    int brightness = doc["brightness"];
+  } else if (String(topic) == "esp32/led_1/change_brightness") {
+    String brightness = doc["brightness"];
     Serial.println("Received change_brightness: " + String(brightness));
-    Serial2.print("change_brightness=" + brightness);  // Chỉ gửi giá trị độ sáng
+    Serial2.println("change_brightness=" + brightness);  // Chỉ gửi giá trị độ sáng
   }
 }
 
@@ -144,7 +147,6 @@ void sendLedData(String status, int brightness, int lightIntensity, String motio
   serializeJson(doc, mqtt_message);
   publishMessage("esp32/led_1", mqtt_message);  // Publish all data in one topic
 }
-
 // Receiver data handling
 void receiveDataFromReceiver() {
   if (Serial2.available()) {
@@ -162,7 +164,7 @@ void receiveDataFromReceiver() {
     }
 
     // Lấy dữ liệu từ JSON
-    int lightIntensity = doc["lightIntesity"];
+    int lightIntensity = doc["lightIntensity"];
     int brightness = doc["brightness"];
     String lightStatus = doc["light_status"];
     String motionStatus = doc["motion_status"];
@@ -187,24 +189,17 @@ void setup() {
   setup_mqtt();
   client.setCallback(callback);
 }
-
-// Hàm kiểm tra và gửi dữ liệu nếu có thay đổi đáng kể
-void sendLightDataIfChanged(float lux) {
-  static float lastLux = -1;
-  if (abs(lux - lastLux) > 50) {  // Nếu sự thay đổi cường độ ánh sáng lớn hơn 10 lux
-    sendLightData(lux);
-    lastLux = lux;
-  }
-}
-
+int cnt = 0;
 void loop() {
+  Serial.println("Loop---------------" + String(cnt++));
   check_mqtt_connection();
   client.loop();
 
   float lux = readLightLevel();
-  sendLightDataIfChanged(lux);  // Gửi dữ liệu nếu có thay đổi đáng kể
+  sendLightData(lux);
   controlLED(lux);
   receiveDataFromReceiver();
 
-  delay(2000);  // Delay to avoid rapid data transmission
+  delay(2500);  // Delay to avoid rapid data transmission
 }
+

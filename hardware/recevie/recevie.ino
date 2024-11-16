@@ -1,6 +1,7 @@
 #include "Arduino.h"
 #include <ArduinoJson.h>
 #include <TimeLib.h>
+#include <WiFi.h>
 
 // Pin Definitions
 #define RXD2 16
@@ -8,6 +9,27 @@
 #define MOTION_PIN 5  // Motion sensor input pin
 #define LED_PIN 4     // LED output pin (PWM supported)
 #define ELEC_METRIC_PIN 13
+
+int lightIntensity = 0;
+int brightnessPercentage = 0;
+String motion_status = "";
+
+// Wi-Fi thông tin
+const char* ssid = "IEC_2";            // Thay bằng tên Wi-Fi của bạn
+const char* password = "123456789a@";  // Thay bằng mật khẩu Wi-Fi
+
+const char* ntpServer = "asia.pool.ntp.org";  // NTP Server để đồng bộ
+const long gmtOffset_sec = 7 * 3600;          // UTC +7 cho Việt Nam
+const int daylightOffset_sec = 0;
+
+int startHour, startMin, endHour, endMin;
+bool scheduleSet = false;  // Biến cờ để kiểm tra nếu lịch trình đã được cài đặt
+
+// Declare flags to track changes
+bool statusChanged = false;
+bool scheduleChanged = false;
+bool brightnessChanged = false;
+bool environmentChanged = false;
 
 // Khởi tạo Serial và pin
 void setup() {
@@ -17,6 +39,29 @@ void setup() {
 
   pinMode(MOTION_PIN, INPUT);  // Motion sensor pin as input
   pinMode(LED_PIN, OUTPUT);    // LED pin as output
+
+  // Kết nối Wi-Fi
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println(" Đã kết nối WiFi");
+
+  // Cài đặt múi giờ và đồng bộ thời gian
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+  delay(2000);
+}
+
+// Lấy giờ và phút hiện tại từ NTP
+void getCurrentTime(int& curHour, int& curMin) {
+  struct tm timeinfo;
+  if (getLocalTime(&timeinfo)) {
+    curHour = timeinfo.tm_hour;
+    curMin = timeinfo.tm_min;
+  } else {
+    Serial.println("Không thể lấy thời gian từ NTP");
+  }
 }
 
 // Điều khiển độ sáng đèn LED
@@ -24,147 +69,171 @@ void controlLED(int brightness) {
   analogWrite(LED_PIN, brightness);
 }
 
-// Xử lý tín hiệu change_status và bật/tắt đèn
-void handleStatus(String status) {
-  if (status == "on") {
-    controlLED(255);  // Bật đèn
-    Serial.println("LED turned ON");
-  } else if (status == "off") {
-    controlLED(0);  // Tắt đèn
-    Serial.println("LED turned OFF");
-  }
+void handleBrightness(int brightness) {
+  scheduleSet = false;
+  controlLED(brightness);
+  lightIntensity = brightness;
+  
+  brightnessChanged = true; // Set flag to indicate a brightness change
+  environmentChanged = false;
+  statusChanged = false;
+  scheduleChanged = false;
 }
 
-// Xử lý tín hiệu change_schedule
+// Xử lý tín hiệu change_status và bật/tắt đèn
+void handleStatus(String status) {
+  scheduleSet = false;
+  if (status == "on") {
+    controlLED(255);  // Bật đèn
+    lightIntensity = 255;
+    sendDataToTransmitter();
+  } else if (status == "off") {
+    controlLED(0);  // Tắt đèn
+    lightIntensity = 0;
+    sendDataToTransmitter();
+  }
+  statusChanged = true; // Set flag to indicate a status change
+  environmentChanged = false;
+  scheduleChanged = false;
+  brightnessChanged = false;
+}
+
 void handleSchedule(String schedule) {
-  // Tách startTime và endTime từ chuỗi "hh:mm;hh:mm"
   int separatorIndex = schedule.indexOf(';');
   String startTime = schedule.substring(0, separatorIndex);
   String endTime = schedule.substring(separatorIndex + 1);
 
-  // Chuyển đổi startTime và endTime thành giờ và phút
-  int startHour = startTime.substring(0, 2).toInt();
-  int startMin = startTime.substring(3).toInt();
-  int endHour = endTime.substring(0, 2).toInt();
-  int endMin = endTime.substring(3).toInt();
+  startHour = startTime.substring(0, 2).toInt();
+  startMin = startTime.substring(3).toInt();
+  endHour = endTime.substring(0, 2).toInt();
+  endMin = endTime.substring(3).toInt();
 
-  // Lấy giờ và phút hiện tại
-  // time_t currentTime = now();
-  // int curHour = hour(currentTime);
-  // int curMin = minute(currentTime);
-  
-  int curHour = 6;
-  int curMin = 33;
+  scheduleChanged = true; // Set flag to indicate a schedule change
+  environmentChanged = false;
+  statusChanged = false;
+  brightnessChanged = false;
+}
+
+void checkSchedule() {
+  if (!scheduleChanged) return;  // Nếu lịch trình chưa được cài đặt, bỏ qua kiểm tra
+
+  int curHour, curMin;
+  getCurrentTime(curHour, curMin);  // Lấy giờ và phút hiện tại
+
+  Serial.println(String(curHour) + ":" + String(curMin));  // In ra giờ:phút hiện tại
 
   // Xác định nếu lịch trình đang hoạt động
-  bool isScheduleActive;
+  bool isScheduleActive = false;
   if (startHour < endHour || (startHour == endHour && startMin < endMin)) {
     // Lịch trình không qua đêm (VD: 08:00 -> 18:00)
+    Serial.println("Jump in 1:----------------");
     isScheduleActive = (curHour > startHour || (curHour == startHour && curMin >= startMin)) && (curHour < endHour || (curHour == endHour && curMin < endMin));
   } else {
     // Lịch trình qua đêm (VD: 18:00 -> 06:00)
+    Serial.println("Jump in 2:----------------");
     isScheduleActive = (curHour > startHour || (curHour == startHour && curMin >= startMin)) || (curHour < endHour || (curHour == endHour && curMin < endMin));
   }
 
-  // Kiểm tra trạng thái và điều chỉnh đèn
+  Serial.println(isScheduleActive);
+
   if (isScheduleActive) {
-    analogWrite(LED_PIN, 25);  // Đèn sáng 10%
-    handleMotionSensor();      // Chuyển sang hàm kiểm tra cảm biến chuyển động
-    Serial.println("LED dim to 10%");
+    controlLED(25);  // Đèn sáng 10%
+    handleMotionSensor();
   } else {
-    analogWrite(LED_PIN, 0);  // Tắt đèn
-    Serial.println("LED turned off due to schedule");
-
-    // Kiểm tra dữ liệu môi trường từ bộ phát qua Serial2
-    if (Serial2.available()) {
-      String receivedData = Serial2.readStringUntil('\n');
-      Serial.println("Data received from master: " + receivedData);
-
-      if (receivedData.startsWith("change_environment=")) {
-        int environment = receivedData.substring(19).toInt();
-        if (environment == 0) {
-          controlLED(0);  // Tắt đèn nếu ánh sáng môi trường cao
-          sendDataToTransmitter(0, "Led off");
-        } else {
-          handleMotionSensor();  // Kiểm tra cảm biến chuyển động nếu ánh sáng môi trường thấp
-        }
-      }
-    }
+    checkTransmitterEnvironmentData();
   }
 }
 
-// Kiểm tra và xử lý tín hiệu từ bộ phát (transmitter)
+// Kiểm tra và xử lý tín hiệu từ bộ phát
 void checkTransmitterData() {
   if (Serial2.available()) {
-    String receivedData = Serial2.readStringUntil('\n');  // Đọc đến khi gặp ký tự xuống dòng
-    // String receivedData = "change_brightness=50";
-    Serial.println("Data received from master (raw): " + receivedData);
+    String receivedData = Serial2.readStringUntil('\n');
+    Serial.println("Received Data: " + receivedData);
+    receivedData.trim();
 
-    receivedData.trim();  // Loại bỏ khoảng trắng hoặc ký tự xuống dòng thừa
-
-    if (receivedData.startsWith("change_environment=")) {
-      String envValue = receivedData.substring(19);                // Lấy phần "1" hoặc "0" từ chuỗi
-      Serial.println("Environment value as string: " + envValue);  // In chuỗi con để kiểm tra
-
-      // Kiểm tra chuỗi thay vì dùng toInt()
-      if (envValue == "1") {
-        Serial.println("Environment detected as 1 - Motion Sensor Activated");
-        handleMotionSensor();  // Kiểm tra cảm biến chuyển động nếu ánh sáng môi trường thấp
-      } else if (envValue == "0") {
-        Serial.println("Environment detected as 0 - LED turned off");
-        controlLED(0);  // Tắt đèn nếu ánh sáng môi trường cao
-        sendDataToTransmitter(0, "Led off");
-      } else {
-        Serial.println("Unexpected environment value.");
-      }
-    } else if (receivedData.startsWith("change_status=")) {
-      String status = receivedData.substring(14);
-      handleStatus(status);
+    if (receivedData.startsWith("change_status=")) {
+      handleStatus(receivedData.substring(14));
     } else if (receivedData.startsWith("change_schedule=")) {
-      String schedule = receivedData.substring(16);
-      handleSchedule(schedule);
+      handleSchedule(receivedData.substring(16));
     } else if (receivedData.startsWith("change_brightness=")) {
       int brightness = receivedData.substring(18).toInt();
-      controlLED(brightness);
+      handleBrightness(brightness);
+    } else if (receivedData.startsWith("change_environment=")) {
+      sendDataToTransmitter();
     }
   }
 }
 
-// Xử lý cảm biến chuyển động và gửi dữ liệu lại cho bộ phát
-void handleMotionSensor() {
-  int motionDetected = digitalRead(MOTION_PIN);
-  Serial.println(motionDetected);
-  // 0-255
-  if (motionDetected == 1) {
-    // Motion detected, set brightness to 100%
-    controlLED(255);
-    sendDataToTransmitter(255, "Motion detected!");
-  } else {
-    // No motion detected, set brightness to 10%
-    controlLED(25);
-    sendDataToTransmitter(25, "No motion detected!");
-  }
-}
+// Gửi dữ liệu đến master
+void sendDataToTransmitter() {
+  brightnessPercentage = map(lightIntensity, 0, 255, 0, 100);
 
-void sendDataToTransmitter(int lightIntensity, String motion_status) {
-  int brightnessPercentage = map(lightIntensity, 0, 255, 0, 100);
-
-  // Create Json
   DynamicJsonDocument doc(256);
-  doc["lightIntesity"] = lightIntensity;
+  doc["lightIntensity"] = lightIntensity;
   doc["brightness"] = brightnessPercentage;
   doc["light_status"] = (lightIntensity > 0) ? "on" : "off";
   doc["motion_status"] = motion_status;
 
-  // Tao JSON và gửi qua Serial2
-  char jsonBuffer[128];
+  char jsonBuffer[256];
   serializeJson(doc, jsonBuffer);
-  Serial2.write(jsonBuffer);
+  Serial2.println(jsonBuffer);
   Serial.println("Send Data: " + String(jsonBuffer));
 }
 
-// Vòng lặp chính
+// Sửa đổi hàm `checkTransmitterEnvironmentData` để đặt `environmentChanged` khi có sự thay đổi
+void checkTransmitterEnvironmentData() {
+  if (Serial2.available()) {
+    String receivedData = Serial2.readStringUntil('\n');
+    Serial.println("Received Data Environment--------: " + receivedData);
+    receivedData.trim();
+
+    if (receivedData.startsWith("change_environment=")) {
+      // Xử lý dữ liệu môi trường và đặt biến `environmentChanged` thành true
+      if (receivedData.substring(19) == "0") {
+        controlLED(0);
+        lightIntensity = 0;
+        motion_status = "No motion detected!";
+        sendDataToTransmitter();
+      } else {
+        handleMotionSensor();
+      }
+    }
+  }
+}
+
+// Xử lý cảm biến chuyển động
+void handleMotionSensor() {
+  if (digitalRead(MOTION_PIN) == 1) {
+    controlLED(255);
+    lightIntensity = 255;
+    motion_status = "Motion detected!";
+  } else {
+    controlLED(25);
+    lightIntensity = 25;
+    motion_status = "No motion detected!";
+  }
+  sendDataToTransmitter();
+}
+
+int cnt = 0;
 void loop() {
-  checkTransmitterData();
-  delay(500);
+  Serial.println("Loop: -------" + String(cnt++));
+  checkTransmitterData();  // Kiểm tra dữ liệu từ bộ phát
+  delay(1000);
+  checkSchedule();         // Kiểm tra thời gian với lịch trình
+  // Gửi dữ liệu cập nhật khi có bất kỳ thay đổi nào
+  // delay(1000);
+  // checkTransmitterEnvironmentData();
+  if (statusChanged || scheduleChanged || brightnessChanged || environmentChanged) {
+    delay(1000);
+    Serial.println("statusChanged:---------" + String(statusChanged));
+    Serial.println("scheduleChanged:---------" + String(scheduleChanged));
+    Serial.println("brightnessChanged:---------" + String(brightnessChanged));
+    Serial.println("environmentChanged:---------" + String(environmentChanged));
+
+    sendDataToTransmitter();  // Gửi trạng thái mới nhất đến bộ phát
+  }
+  
+  delay(1000); // Delay để tránh kiểm tra quá thường xuyên
+
 }
