@@ -11,6 +11,7 @@ interface IJWT {
 }
 
 type User = {
+  email: string,
   _id: string;
   username: string;
   role: string;
@@ -81,11 +82,12 @@ export const signUp = async (
   next: express.NextFunction
 ) => {
   try {
-    const { username, password } = req.body;
+    const { email, firstName, lastName, password } = req.body;
 
     const hashedPassword = await hashPassword(password);
     const user = new User({
-      username,
+      email,
+      username: firstName + " " + lastName,
       password: hashedPassword,
     });
 
@@ -106,10 +108,10 @@ export const login = async (
   next: express.NextFunction
 ) => {
   try {
-    const { username, password } = req.body;
+    const { email, password } = req.body;
 
     const user = await User.findOne({
-      username,
+      email,
     });
 
     if (!user) {
@@ -121,11 +123,12 @@ export const login = async (
     if (!user || !(await comparePassword(password, user.password)))
       res.status(401).json({
         status: "unauthorized",
-        message: "Your username or password is incorrect!",
+        message: "Your email or password is incorrect!",
       });
 
     const userPayload: User = {
       _id: user._id as string,
+      email: user.email as string,
       role: user.role as string,
       username: user.username as string,
     };
