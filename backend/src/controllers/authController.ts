@@ -22,6 +22,7 @@ const signToken = (user: User) => {
     {
       id: user._id,
       username: user.username,
+      email: user.email,
       role: user.role,
     },
     JWT_SECRET,
@@ -109,11 +110,11 @@ export const login = async (
 ) => {
   try {
     const { email, password } = req.body;
-
+    console.log(email, password);
     const user = await User.findOne({
       email,
     });
-
+    console.log(user);
     if (!user) {
       res.status(401).json({
         message: "No user found with this username! Try again",
@@ -128,7 +129,7 @@ export const login = async (
 
     const userPayload: User = {
       _id: user._id as string,
-      email: user.email as string,
+      email: user.email,
       role: user.role as string,
       username: user.username as string,
     };

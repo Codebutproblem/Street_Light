@@ -3,22 +3,30 @@ import { useContext, createContext, useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import { jwtDecode } from "jwt-decode"; // Corrected import for jwt-decode
 
+// Context for controlling sidebar expansion state
 const SidebarContext = createContext();
 
 export default function Sidebar({ children }) {
   const [expanded, setExpanded] = useState(true);
   const [user, setUser] = useState(null);
 
+  // UseEffect to handle token retrieval and user decoding
   useEffect(() => {
     const token = localStorage.getItem("authToken");
+    console.log("Token from localStorage:", token); // Debugging log to check token
 
     if (token) {
       try {
         const decodedToken = jwtDecode(token);
+        console.log("Decoded token:", decodedToken); // Debugging log to check decoded token
         setUser(decodedToken); // Assuming token has user data like name, email
       } catch (error) {
         console.error("Invalid JWT token", error);
+        setUser(null); // Handle invalid token gracefully
       }
+    } else {
+      console.log("No token found in localStorage");
+      setUser(null); // Handle missing token gracefully
     }
   }, []);
 
@@ -27,6 +35,7 @@ export default function Sidebar({ children }) {
       className={`h-screen ${expanded ? "max-w-[300px] w-full" : "w-fit"}`}
     >
       <nav className="h-full flex flex-col bg-white border-r shadow-sm">
+        {/* Sidebar header with logo and toggle button */}
         <div
           className={`flex items-center ${
             expanded ? "p-4 justify-between" : "p-4 mt-5 justify-center"
@@ -47,11 +56,12 @@ export default function Sidebar({ children }) {
           </button>
         </div>
 
+        {/* Sidebar context provider for child components */}
         <SidebarContext.Provider value={{ expanded }}>
           <ul className="flex-1 px-3">{children}</ul>
         </SidebarContext.Provider>
 
-        {/* User info section */}
+        {/* User info section (if user is logged in) */}
         {user ? (
           <div className="border-t flex items-center justify-center p-3">
             <img
@@ -60,13 +70,12 @@ export default function Sidebar({ children }) {
               className="w-10 h-10 rounded-md"
             />
             <div
-              className={`
-                flex justify-between items-center
-                overflow-hidden transition-all ${expanded ? "w-52 ml-3" : "w-0"}
-            `}
+              className={`flex justify-between items-center overflow-hidden transition-all ${
+                expanded ? "w-52 ml-3" : "w-0"
+              }`}
             >
               <div className="leading-4">
-                <h4 className="font-semibold">{user.name}</h4>
+                <h4 className="font-semibold">{user.username}</h4>
                 <span className="text-xs text-gray-600">{user.email}</span>
               </div>
               <MoreVertical size={20} />
@@ -87,33 +96,27 @@ export default function Sidebar({ children }) {
   );
 }
 
-export function SidebarItem({ icon, text, alert, to }) {
+// SidebarItem component for individual sidebar items
+export function SidebarItem({ icon, text, alert, to, onClick }) {
   const { expanded } = useContext(SidebarContext);
 
   return (
-    <li
-      className={`
-        relative flex items-center py-2 px-3 my-1
-        font-medium rounded-md cursor-pointer
-        transition-colors group
-      `}
-    >
+    <li className="relative flex items-center py-2 px-3 my-1 font-medium rounded-md cursor-pointer transition-colors group">
       <NavLink
         to={to}
         className={({ isActive }) =>
           isActive
-            ? "p-3 rounded-lg bg-gradient-to-tr from-indigo-200 to-indigo-100 text-indigo-800 w-full"
+            ? "p-3 rounded-lg bg-gradient-to-tr from-indigo-200 to-indigo-100 text-indigo-800 w-full active" // Active state styling
             : "p-3 rounded-lg hover:bg-indigo-50 text-gray-600 w-full"
         }
+        onClick={onClick} // Call onClick when clicking the item
       >
         <span className="flex items-center w-full">
           {icon && <span className="text-xl">{icon}</span>}
           <span
-            className={`
-            overflow-hidden transition-all 
-            ${expanded ? "w-auto ml-3 opacity-100" : "w-0 opacity-0"}
-            ${!expanded ? "max-w-0" : "max-w-full"}
-          `}
+            className={`overflow-hidden transition-all ${
+              expanded ? "w-auto ml-3 opacity-100" : "w-0 opacity-0"
+            } ${!expanded ? "max-w-0" : "max-w-full"}`}
           >
             {text}
           </span>
@@ -129,14 +132,7 @@ export function SidebarItem({ icon, text, alert, to }) {
       )}
 
       {!expanded && (
-        <div
-          className={`
-            absolute left-full rounded-md px-2 py-1 ml-6
-            bg-indigo-100 text-indigo-800 text-sm
-            invisible opacity-20 -translate-x-3 transition-all
-            group-hover:visible group-hover:opacity-100 group-hover:translate-x-0
-          `}
-        >
+        <div className="absolute left-full rounded-md px-2 py-1 ml-6 bg-indigo-100 text-indigo-800 text-sm invisible opacity-20 -translate-x-3 transition-all group-hover:visible group-hover:opacity-100 group-hover:translate-x-0">
           {text}
         </div>
       )}

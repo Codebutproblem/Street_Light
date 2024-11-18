@@ -49,7 +49,7 @@ const Dashboard = () => {
       reconnectionDelayMax: 20000,
       auth: {
         token:
-          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3MzE1Yjc2MWZjOTUxNGFkNzM0NDAxNSIsInVzZXJuYW1lIjoia2hvaSIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzMxMjg3OTQwLCJleHAiOjQzMjMyODc5NDB9.20SvjSNfeM5VNRbUteA6kyO0OFj0XeXlJcfHFnfj5Gc",
+          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3MzgwY2VlYTg2MjQ0YzM4MjUwMDBkMiIsInVzZXJuYW1lIjoidW5kZWZpbmVkIHVuZGVmaW5lZCIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzMxNzI2NTc0LCJleHAiOjQzMjM3MjY1NzR9.s6vzjfXStWHtra0Mgj7kZLbCtjB4-GlvwA9_nmZshbo",
       },
     });
 

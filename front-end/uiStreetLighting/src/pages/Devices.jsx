@@ -1,17 +1,20 @@
 import React, { useState, useEffect } from "react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
-import mqtt from "mqtt";
 import { io } from "socket.io-client";
 
 const Devices = () => {
   const [devices, setDevices] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [currentPosition, setCurrentPosition] = useState(null);
-  const [mqttClient, setMqttClient] = useState(null);
+  const [currentPosition, setCurrentPosition] = useState({
+    longitude: 105.787498,
+    latitude: 20.981335,
+  });
   const [fallbackTriggered, setFallbackTriggered] = useState(false);
   const [sensorData, setSensorData] = useState([]);
+  const [lights, setLights] = useState([]);
+
   useEffect(() => {
     // Set up the socket connection
     const socket = io("http://localhost:8087", {
@@ -53,13 +56,11 @@ const Devices = () => {
       triggerFallback();
     });
 
-    socket.on("IOT_BH1750", (data) => {
-      console.log("Sensor data received:", data);
-      setSensorData((prev) => [...prev, data]);
-    });
-
+    // Handle light data updates
     socket.on("IOT_LED_1", (data) => {
       console.log("Light data received:", data);
+
+      // Update the devices state with the new GPS location data for each device
       setLights((prev) => {
         const updatedLights = prev.map((light) => {
           if (light.device === data.device) {
@@ -75,6 +76,36 @@ const Devices = () => {
         }
         return updatedLights;
       });
+
+      // Update the device location
+      setDevices((prevDevices) => {
+        const updatedDevices = prevDevices.map((device) => {
+          if (device.device === data.device) {
+            return {
+              ...device,
+              latitude: data.Latitude,
+              longitude: data.Longitude,
+            };
+          }
+          return device;
+        });
+        if (!updatedDevices.some((device) => device.device === data.device)) {
+          updatedDevices.push({
+            device: data.device,
+            latitude: data.Latitude,
+            longitude: data.Longitude,
+          });
+        }
+        return updatedDevices;
+      });
+
+      // Update current position to the latest device
+      setCurrentPosition({
+        longitude: data.Longitude,
+        latitude: data.Latitude,
+      });
+
+      setLoading(false);
     });
 
     return () => {
@@ -82,93 +113,9 @@ const Devices = () => {
     };
   }, []); // Empty array means this effect runs only once when the component mounts
 
-  useEffect(() => {
-    const getCurrentLocation = () => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            setCurrentPosition({
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-            });
-            setLoading(false);
-          },
-          (error) => {
-            setError("Unable to retrieve location.");
-            setLoading(false);
-          }
-        );
-      } else {
-        setError("Geolocation is not supported by this browser.");
-        setLoading(false);
-      }
-    };
-
-    getCurrentLocation();
-
-    // MQTT connection options
-    const options = {
-      host: "a290b9bc05ee4afdbc18a2fd30f92d28.s1.eu.hivemq.cloud",
-      port: 8884,
-      protocol: "wss",
-      username: "thanh",
-      password: "123",
-      path: "mqtt", // WebSocket path for HiveMQ
-    };
-
-    const client = mqtt.connect(
-      `${options.protocol}://${options.host}:${options.port}/${options.path}`,
-      {
-        username: options.username,
-        password: options.password,
-      }
-    );
-
-    setMqttClient(client);
-
-    client.on("connect", () => {
-      client.subscribe("devices/+/location", (err) => {
-        if (err) {
-          setError("Error subscribing to location topic.");
-          setLoading(false);
-        } else {
-          setLoading(false);
-        }
-      });
-    });
-
-    client.on("message", (topic, message) => {
-      try {
-        const locationData = JSON.parse(message.toString());
-        const deviceId = topic.split("/")[1];
-
-        setDevices((prevDevices) => {
-          const existingDevice = prevDevices.find(
-            (device) => device.id === deviceId
-          );
-          if (existingDevice) {
-            return prevDevices.map((device) =>
-              device.id === deviceId ? { ...device, ...locationData } : device
-            );
-          } else {
-            return [...prevDevices, { id: deviceId, ...locationData }];
-          }
-        });
-      } catch (error) {
-        setError("Error processing incoming message.");
-      }
-    });
-
-    return () => {
-      if (client) {
-        client.end();
-      }
-    };
-  }, []);
-
   const mapCenter = currentPosition
     ? [currentPosition.latitude, currentPosition.longitude]
-    : [51.505, -0.09]; // Default fallback location
+    : [20.981335, 105.787498]; // Default fallback location
 
   return (
     <div className="w-full flex flex-col items-center p-4">
@@ -193,12 +140,12 @@ const Devices = () => {
           {/* Render markers for each device */}
           {devices.map((device) => (
             <Marker
-              key={device.id}
-              position={[device.latitude, device.longitude]}
+              key={device.device}
+              position={[device.latitude, device.longitude]} // Use device's dynamic coordinates
               icon={new L.Icon.Default()} // Default Leaflet marker
             >
               <Popup>
-                <strong>Device {device.id}</strong>
+                <strong>Device {device.device}</strong>
                 <br />
                 Latitude: {device.latitude}
                 <br />
@@ -208,16 +155,6 @@ const Devices = () => {
           ))}
         </MapContainer>
       </div>
-
-      {/* Optional button to refresh location */}
-      {mqttClient && (
-        <button
-          onClick={() => mqttClient.publish("devices/refresh", "get location")}
-          className="mt-6 px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-all"
-        >
-          Refresh Devices Location
-        </button>
-      )}
     </div>
   );
 };

@@ -28,6 +28,12 @@ const isAuthenticated = () => {
   return token ? true : false; // Check if token exists
 };
 
+// Function to handle logout
+const handleLogout = () => {
+  localStorage.removeItem("authToken"); // Clear the authentication token
+  window.location.href = "/signIn"; // Redirect to the SignIn page
+};
+
 // ProtectedRoute component to wrap routes that require authentication
 const ProtectedRoute = ({ children }) => {
   return isAuthenticated() ? children : <Navigate to="/signIn" />;
@@ -74,7 +80,8 @@ function AppContent() {
             <SidebarItem
               icon={<LogOut size={30} />}
               text={"Logout"}
-              to="/signIn"
+              onClick={handleLogout} // Call logout function when clicked
+              to="/signIn" // We don't need this 'to' as we are manually redirecting in handleLogout
             />
           )}
           <hr className="my-3" />
@@ -118,12 +125,30 @@ function AppContent() {
             }
           />
           {/* Public routes */}
-          <Route path="/signIn" element={<SignIn />} />
-          <Route path="/signUp" element={<SignUp />} />
-          <Route path="/settings" element={<SettingsPage />} />
+          <Route
+            path="/signIn"
+            element={
+              isAuthenticated() ? <Navigate to="/dashboard" /> : <SignIn />
+            }
+          />
+          <Route
+            path="/signUp"
+            element={
+              isAuthenticated() ? <Navigate to="/dashboard" /> : <SignUp />
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <SettingsPage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/help" element={<HelpPage />} />
+
           {/* Default route */}
-          <Route path="/" element={<Dashboard />} />
+          <Route path="*" element={<Navigate to="/signUp" />} />
         </Routes>
       </div>
     </div>

@@ -26,13 +26,15 @@ const SignIn = () => {
   const navigate = useNavigate();
 
   const onSubmit = async (data) => {
+    console.log(data);
     if (isValid) {
       try {
         // Send login request to the backend
         const response = await axios.post(
           "http://localhost:8087/api/v1/signin",
           {
-            data,
+            email: data.email,
+            password: data.password,
           }
         );
 
