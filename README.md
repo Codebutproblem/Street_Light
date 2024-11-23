@@ -1,21 +1,34 @@
 # iot-street-lighting
 
-# Hướng dẫn Cách chạy Backend
+## Hướng dẫn cách chạy Frontend
+
+1. Mở terminal và điều hướng đến thư mục uiStreetLighting
+```
+cd front-end/uiStreetLighting
+```
+
+2. Cài đặt các dependencies cần thiết:
+```
+npm install
+```
+3. Chạy ứng dụng ở chế độ phát triển
+```
+npm run dev
+```
+4. Truy cập được link local: http://localhost:5173
+
+## Hướng dẫn cách chạy Backend
 
 Trước khi chạy BE yêu cầu bật Docker desktop, trong package.json và docker-compose.yml đã setup sẵn docker để sử dụng rabbitMQ. Server chạy trên port 8087
 
 NOTE: Nếu không chạy docker desktop thì sẽ bị lỗi ko gọi được docker dưới terminal
 
-## Tải dependency cho project
-bash
+1. Tải dependency cho project
 ```
 npm i --force
 ```
 
-## Chạy project dưới terminal
-
-bash
-
+2. Chạy project dưới terminal
 ```
 npm start
 ```
